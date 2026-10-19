@@ -1,0 +1,11 @@
+{
+  "tape": "/home/user/rs-rich-doom/docs/tapes/doom-kitty.tape",
+  "tape_fnv1a64": "957d1a9bc86b2d18",
+  "recorder": "rs-rich-record 0.0.8",
+  "rich": null,
+  "commit": null,
+  "screenshots": [
+    "demo"
+  ],
+  "note": "Every frame is real output of the program under test on a PTY."
+}

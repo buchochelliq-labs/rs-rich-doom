@@ -1,0 +1,40 @@
+Vendored from Chocolate Doom, https://github.com/chocolate-doom/chocolate-doom,
+upstream commit e6f632a4397023b6b17cc312525a16b2aacd64d6 (shallow clone,
+2026-10-19), for music: Doom's MUS songs played on an emulated OPL FM chip
+with the IWAD's GENMIDI instruments, as DMX played them on an AdLib or a
+Sound Blaster.
+
+From src/: i_oplmusic.c (the OPL music module), midifile.c, midifile.h.
+From opl/: opl.c, opl.h, opl_internal.h, opl_queue.c, opl_queue.h (the OPL
+library), opl3.c, opl3.h, wf_rom.h (Nuked OPL3, with Chocolate Doom's
+"Nuked-OPL3-fast" changes).
+
+Licences: Chocolate Doom's code is GPL-2.0-or-later (COPYING.md here).
+Nuked OPL3 (opl3.c, opl3.h, wf_rom.h) is LGPL-2.1-or-later
+(LICENSE.LGPL-2.1 here, from https://github.com/nukeykt/Nuked-OPL3), which
+may be combined with this GPL program.
+
+Not taken: the SDL, Linux/OpenBSD port-I/O and Windows drivers
+(opl_sdl.c, opl_linux.c, opl_obsd.c, opl_win32.c, opl_timer.c,
+ioperm_sys.c). This port's driver is csrc/music.c, after opl_sdl.c: it
+makes samples when the Rust mixer (src/sound.rs) asks for them.
+mus2mid.c comes from doomgeneric (see doomgeneric/NOTE).
+
+rs_compat.h is this port's (force-included by build.rs): the few names
+Chocolate Doom's headers have and doomgeneric's lack (PACKED_STRUCT,
+SDL_SwapBE16/32, I_Realloc, opl_driver_ver_t).
+
+Local changes, each under #ifdef RS_RICH_DOOM unless noted:
+- opl.c: no config.h or SDL.h; the only driver is opl_rs_driver; OPL_Delay
+  advances the software driver's clock (OPL_RS_Delay) instead of waiting
+  on an SDL condition for the audio thread.
+- opl_internal.h: declares opl_rs_driver and OPL_RS_Delay instead of the
+  SDL driver.
+- i_oplmusic.c: songs are converted (mus2mid) and read in memory, without
+  a temporary file; a missing or short GENMIDI lump turns music off
+  instead of reading past it; a lump can be given directly (tests);
+  music_opl_module and its device list are not const (doomgeneric's
+  i_sound.h declares them so).
+- midifile.c, midifile.h (not under #ifdef): MIDI_LoadFile reads from
+  memory (a MEMFILE, doomgeneric's memio.c) instead of a file name.
+Everything else is unmodified.
