@@ -6,7 +6,7 @@
 //! - [`render`]: fitting, resampling, half blocks and Braille.
 //! - [`graphics`]: Kitty, Sixel and iTerm2 images.
 //! - [`app`]: the intuiTUIve app.
-//! - [`sound`]: sound effects through cpal.
+//! - [`sound`]: sound effects and OPL music through cpal.
 //! - [`data`]: the data directory and Freedoom's download.
 //! - [`cli`]: the command line.
 //!

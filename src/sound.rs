@@ -282,7 +282,7 @@ mod device {
             .ok_or_else(|| "no audio output device".to_string())?;
         let supported = device
             .default_output_config()
-            .map_err(|e| format!("audio output: {e}"))?;
+            .map_err(|e| format!("no audio output ({e})"))?;
         let config = supported.config();
         let channels = (config.channels as usize).max(1);
         let rate = config.sample_rate;
@@ -314,8 +314,10 @@ mod device {
                 |_| {},
                 None,
             )
-            .map_err(|e| format!("audio output: {e}"))?;
-        stream.play().map_err(|e| format!("audio output: {e}"))?;
+            .map_err(|e| format!("no audio output ({e})"))?;
+        stream
+            .play()
+            .map_err(|e| format!("no audio output ({e})"))?;
         // The stream plays for the rest of the process.
         std::mem::forget(stream);
         Ok(Output {

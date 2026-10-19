@@ -29,7 +29,8 @@ path = "src/main.rs"
 [features]
 default = ["sound"]
 # Sound effects through cpal (ALSA on Linux, which needs libasound2-dev to
-# build; CoreAudio on macOS; WASAPI on Windows). Music is not played.
+# build; CoreAudio on macOS; WASAPI on Windows), and music: OPL FM
+# synthesis (opl/, Chocolate Doom's OPL module and Nuked OPL3).
 sound = ["dep:cpal"]
 
 # The rs-rich crates, pinned to one commit of the branch this was written

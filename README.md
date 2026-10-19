@@ -197,9 +197,29 @@ truecolour terminal. By brightness:
 
 Sound effects play through cpal (ALSA, CoreAudio, WASAPI): the engine's
 sound module (`csrc/sound.c`) reads each effect's DMX lump and a small Rust
-mixer (`src/sound.rs`) resamples and pans it. **Music is not played** (MUS
-needs a MIDI or OPL synthesizer). `--no-sound`, or build with
-`--no-default-features`.
+mixer (`src/sound.rs`) resamples and pans it. Music: see below.
+`--no-sound`, or build with `--no-default-features`.
+
+## Music
+
+Music is played as on DOS with a Sound Blaster: **OPL FM synthesis** of
+the MUS songs with the instrument patches from the IWAD's `GENMIDI` lump
+(Freedoom ships one), no SoundFont needed. The engine's music module is
+[Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom)'s OPL
+code (`i_oplmusic.c`, DMX's voice allocation and quirks) driving the
+[Nuked OPL3](https://github.com/nukeykt/Nuked-OPL3) emulator, vendored in
+[`opl/`](opl) (GPL-2.0 and LGPL-2.1; see its [NOTE](opl/NOTE)). The Rust
+audio callback pulls the samples at the device's rate and mixes them with
+the effects; the game's own music volume (Options → Sound) applies.
+Emulating the chip costs about 1.5% of one core.
+
+| Option | |
+|---|---|
+| `--no-music` | no music (`--no-sound` turns off only the effects) |
+| `--music-volume PERCENT` | music loudness over the game's volume (default 100, up to 400) |
+
+With no audio output device the game plays silently and says so in one
+line after it exits.
 
 ## How it works
 
