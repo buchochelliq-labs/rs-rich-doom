@@ -1,0 +1,11 @@
+{
+  "tape": "/home/user/rs-rich-doom/docs/tapes/doom-half.tape",
+  "tape_fnv1a64": "3d8535cb085145b3",
+  "recorder": "rs-rich-record 0.0.8",
+  "rich": null,
+  "commit": null,
+  "screenshots": [
+    "demo"
+  ],
+  "note": "Every frame is real output of the program under test on a PTY."
+}

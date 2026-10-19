@@ -1,5 +1,18 @@
 # rs-rich-doom
 
+![Freedoom's first demo in half blocks, recorded with rs-rich-record](docs/media/doom-half/doom-half.gif)
+
+*Freedoom's first demo (`-- -playdemo demo1`) in half blocks, 100x32, 35
+frames a second; also [in Kitty graphics](docs/media/doom-kitty/doom-kitty.gif)
+and as animated PNGs ([half blocks](docs/media/doom-half/doom-half.apng),
+[Kitty](docs/media/doom-kitty/doom-kitty.apng)). The footage is
+[Freedoom](https://freedoom.github.io/) (BSD licence), not id's data; no
+game data is in this repository. Recorded with
+[rs-rich-record](https://github.com/buchochelliq-labs/rs-rich-cli/tree/main/crates/rich-record)
+(`rich record`), which follows the program on a PTY and decodes its Kitty
+images: the tapes are [docs/tapes](docs/tapes), and re-recording takes the
+IWAD's directory as the current one (see the tapes' comments).*
+
 Real Doom in the terminal. The engine is id Software's GPL release of Doom,
 through [doomgeneric](https://github.com/ozkl/doomgeneric) (Chocolate Doom's
 code with a six-function platform layer); the picture, the keyboard and the
