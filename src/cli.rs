@@ -51,6 +51,17 @@ pub struct Cli {
     #[arg(long)]
     pub no_sound: bool,
 
+    /// Turn music off (OPL FM synthesis from the IWAD's GENMIDI
+    /// instruments, as Doom played it on a Sound Blaster).
+    #[arg(long)]
+    pub no_music: bool,
+
+    /// Music loudness in percent, over the game's own music volume (its
+    /// sound menu).
+    #[arg(long, value_name = "PERCENT", default_value_t = 100,
+          value_parser = clap::value_parser!(u32).range(0..=400))]
+    pub music_volume: u32,
+
     /// How long a key whose release the terminal does not report is held
     /// after its first press, in milliseconds (longer than the keyboard's
     /// auto-repeat delay).
@@ -99,6 +110,8 @@ mod tests {
         let cli = parse(&[]);
         assert_eq!(cli.mode, Mode::Auto);
         assert!(cli.iwad.is_none() && !cli.fps && !cli.stretch && !cli.no_sound);
+        assert!(!cli.no_music);
+        assert_eq!(cli.music_volume, 100);
         assert_eq!(cli.hold_ms, 400);
         assert!(cli.command.is_none());
     }
@@ -130,6 +143,10 @@ mod tests {
             assert_eq!(parse(&["--mode", name]).mode, mode);
         }
         assert!(Cli::try_parse_from(["rs-rich-doom", "--mode", "ascii"]).is_err());
+        let cli = parse(&["--no-music", "--music-volume", "40"]);
+        assert!(cli.no_music && !cli.no_sound);
+        assert_eq!(cli.music_volume, 40);
+        assert!(Cli::try_parse_from(["rs-rich-doom", "--music-volume", "500"]).is_err());
     }
 
     #[test]

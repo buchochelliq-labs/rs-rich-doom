@@ -1,6 +1,7 @@
-//! The engine, headless: runs real tics on an IWAD and checks the frames.
-//! Needs `RS_RICH_DOOM_IWAD` (say, Freedoom's freedoom1.wad); skipped
-//! without it. One engine per process, so one test in this file.
+//! The engine, headless: runs real tics on an IWAD and checks the frames,
+//! then the music it plays (OPL, with no audio device). Needs
+//! `RS_RICH_DOOM_IWAD` (say, Freedoom's freedoom1.wad); skipped without
+//! it. One engine per process, so one test in this file.
 
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -9,6 +10,7 @@ use std::time::Duration;
 use rs_rich_doom::engine::{self, Clock, Config, Log};
 use rs_rich_doom::keys::{doom, Hold, HoldTimes, Input};
 use rs_rich_doom::render::{cells, CellMode, Fit, Frame, Resampler};
+use rs_rich_doom::sound;
 
 /// Enough for the title, the menu and the first demo's start.
 const TICS: u64 = 400;
@@ -44,6 +46,9 @@ fn runs_tics_headless_and_draws_frames() {
                 clock: Clock::Virtual,
                 hold: HoldTimes::default(),
                 sound: false,
+                music: true,
+                music_gain: 1.0,
+                headless_audio: true,
             },
             input,
             move |frame| seen.lock().unwrap().push(frame),
@@ -91,4 +96,41 @@ fn runs_tics_headless_and_draws_frames() {
         CellMode::HalfBlocks,
     );
     assert_eq!(lines.len(), 24);
+
+    // The music the engine started (the first demo's level by now), made
+    // without a device: three seconds of it, in 10 ms blocks as an audio
+    // callback would ask.
+    if sound::AVAILABLE {
+        let rate = sound::HEADLESS_RATE_HZ as usize;
+        let mut block = vec![0i16; rate / 100 * 2];
+        let mut peak = 0i32;
+        let mut energy = 0f64;
+        let mut samples = 0usize;
+        let started = std::time::Instant::now();
+        for _ in 0..300 {
+            assert!(sound::render_music(&mut block), "no music is playing");
+            for &s in &block {
+                peak = peak.max(i32::from(s).abs());
+                energy += f64::from(s) * f64::from(s);
+            }
+            samples += block.len();
+        }
+        let took = started.elapsed();
+        let rms = (energy / samples as f64).sqrt();
+        eprintln!(
+            "music: 3 s made in {:.1} ms ({:.2}% of real time), peak {peak}, rms {rms:.0}",
+            took.as_secs_f64() * 1000.0,
+            took.as_secs_f64() / 3.0 * 100.0
+        );
+        assert!(
+            peak > 1000 && rms > 100.0,
+            "silent music: peak {peak}, rms {rms}"
+        );
+        assert!(
+            log.tail(200)
+                .contains("OPL_Init: Using driver 'rs-rich-doom'"),
+            "{}",
+            log.tail(200)
+        );
+    }
 }

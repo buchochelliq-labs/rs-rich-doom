@@ -60,6 +60,13 @@ pub struct Config {
     pub hold: HoldTimes,
     /// Play sound effects (when built with the `sound` feature).
     pub sound: bool,
+    /// Play music (OPL FM synthesis, with the `sound` feature).
+    pub music: bool,
+    /// The music's loudness over the game's own music volume (1.0 as is).
+    pub music_gain: f32,
+    /// No audio device: music is made only when
+    /// [`crate::sound::render_music`] is called (tests).
+    pub headless_audio: bool,
 }
 
 /// The engine's log: the lines it printed, newest last, bounded.
@@ -130,6 +137,10 @@ thread_local! {
 
 static STARTED: AtomicBool = AtomicBool::new(false);
 
+/// The running engine's log, for what C code prints from other threads
+/// (the music's timer callbacks run on the audio thread).
+static ENGINE_LOG: Mutex<Option<Log>> = Mutex::new(None);
+
 fn with_host<T>(f: impl FnOnce(&mut Host) -> T) -> Option<T> {
     HOST.with(|host| host.borrow_mut().as_mut().map(f))
 }
@@ -154,7 +165,13 @@ pub fn run(
         .iwad
         .canonicalize()
         .map_err(|e| format!("{}: {e}", config.iwad.display()))?;
-    crate::sound::configure(config.sound);
+    crate::sound::configure(crate::sound::Audio {
+        sfx: config.sound,
+        music: config.music,
+        music_gain: config.music_gain,
+        headless: config.headless_audio,
+    });
+    *ENGINE_LOG.lock().unwrap_or_else(|e| e.into_inner()) = Some(log.clone());
     HOST.with(|host| {
         *host.borrow_mut() = Some(Host {
             on_frame: Box::new(on_frame),
@@ -175,8 +192,11 @@ pub fn run(
         "-iwad".to_string(),
         iwad.to_string_lossy().into_owned(),
     ];
-    if !config.sound {
-        args.push("-nosound".into());
+    match (config.sound, config.music) {
+        (false, false) => args.push("-nosound".into()),
+        (false, true) => args.push("-nosfx".into()),
+        (true, false) => args.push("-nomusic".into()),
+        (true, true) => {}
     }
     args.extend(config.args);
     // The engine keeps argv for its whole life: leak it.
@@ -302,8 +322,13 @@ extern "C" fn rs_doom_log(text: *const c_char, len: usize) {
     let bytes = unsafe { std::slice::from_raw_parts(text as *const u8, len) };
     let text = String::from_utf8_lossy(bytes);
     if with_host(|host| host.log.push(&text)).is_none() {
-        // Before the engine has a host: nowhere better.
-        eprint!("{text}");
+        let log = ENGINE_LOG.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        match log {
+            // Another thread of the running engine.
+            Some(log) => log.push(&text),
+            // Before the engine has a host: nowhere better.
+            None => eprint!("{text}"),
+        }
     }
 }
 

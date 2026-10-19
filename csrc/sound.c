@@ -5,8 +5,7 @@
  * effect's DMX lump (8-bit unsigned PCM, usually 11025 Hz) and hands the
  * samples to Rust, which resamples and mixes them.
  *
- * Music (MUS lumps, which need a MIDI synthesizer) is not played: the music
- * module is a set of stubs.
+ * Music is csrc/music.c: OPL FM synthesis, mixed in by the same Rust code.
  *
  * Copyright (C) 2026 rs-rich-doom contributors. GPL-2.0-or-later.
  * The lump parsing follows Chocolate Doom's i_sdlsound.c (GPL-2.0-or-later).
@@ -119,44 +118,7 @@ sound_module_t DG_sound_module = {
     CacheSounds,
 };
 
-/* ---- Music: not played. ---- */
-
-static boolean MusicInit(void) { return true; }
-static void MusicShutdown(void) {}
-static void SetMusicVolume(int volume) { (void)volume; }
-static void PauseMusic(void) {}
-static void ResumeMusic(void) {}
-static void *RegisterSong(void *data, int len)
-{
-    (void)data;
-    (void)len;
-    return NULL;
-}
-static void UnRegisterSong(void *handle) { (void)handle; }
-static void PlaySong(void *handle, boolean looping)
-{
-    (void)handle;
-    (void)looping;
-}
-static void StopSong(void) {}
-static boolean MusicIsPlaying(void) { return false; }
-static void Poll(void) {}
-
-music_module_t DG_music_module = {
-    devices,
-    sizeof devices / sizeof devices[0],
-    MusicInit,
-    MusicShutdown,
-    SetMusicVolume,
-    PauseMusic,
-    ResumeMusic,
-    RegisterSong,
-    UnRegisterSong,
-    PlaySong,
-    StopSong,
-    MusicIsPlaying,
-    Poll,
-};
+/* Music is csrc/music.c (DG_music_module). */
 
 /* ---- ALSA's own error messages would land on the game's screen. ---- */
 

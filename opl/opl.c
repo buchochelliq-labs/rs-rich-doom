@@ -15,13 +15,17 @@
 //     OPL interface.
 //
 
+#ifndef RS_RICH_DOOM
 #include "config.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef RS_RICH_DOOM
 #include "SDL.h"
+#endif
 
 #include "opl.h"
 #include "opl_internal.h"
@@ -35,6 +39,11 @@
 
 static opl_driver_t *drivers[] =
 {
+#ifdef RS_RICH_DOOM
+    // rs-rich-doom: only the software driver (csrc/music.c), mixed by
+    // the Rust side.
+    &opl_rs_driver,
+#else
 #if (defined(__i386__) || defined(__x86_64__)) && defined(HAVE_IOPERM)
     &opl_linux_driver,
 #endif
@@ -47,6 +56,7 @@ static opl_driver_t *drivers[] =
 #ifndef DISABLE_SDL2MIXER
     &opl_sdl_driver,
 #endif // DISABLE_SDL2MIXER
+#endif // RS_RICH_DOOM
     NULL
 };
 
@@ -447,6 +457,23 @@ void OPL_Unlock(void)
     }
 }
 
+#ifdef RS_RICH_DOOM
+
+// rs-rich-doom: the software driver's clock only moves as samples are
+// made, on another thread or none at all (headless), so a delay advances
+// that clock instead of waiting for it. It is used only while detecting
+// the chip, before any music is scheduled.
+
+void OPL_Delay(uint64_t us)
+{
+    if (driver != NULL)
+    {
+        OPL_RS_Delay(us);
+    }
+}
+
+#else
+
 typedef struct
 {
     int finished;
@@ -511,6 +538,8 @@ void OPL_Delay(uint64_t us)
     SDL_DestroyMutex(delay_data.mutex);
     SDL_DestroyCond(delay_data.cond);
 }
+
+#endif // RS_RICH_DOOM
 
 void OPL_SetPaused(int paused)
 {

@@ -119,6 +119,9 @@ fn play(cli: Cli) -> Result<ExitCode, String> {
                 ..HoldTimes::default()
             },
             sound: !cli.no_sound,
+            music: !cli.no_music,
+            music_gain: cli.music_volume as f32 / 100.0,
+            headless_audio: false,
         },
         draw,
         fit,
@@ -137,6 +140,9 @@ fn play(cli: Cli) -> Result<ExitCode, String> {
             s.fps(),
             s.mean_draw().as_secs_f64() * 1000.0
         );
+    }
+    if let Some(note) = rs_rich_doom::sound::note() {
+        eprintln!("rs-rich-doom: {note}");
     }
     match outcome.exit {
         Some(exit) if exit.code != 0 => {

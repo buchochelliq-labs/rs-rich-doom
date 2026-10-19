@@ -360,11 +360,42 @@ static boolean opl_stereo_correct = false;
 
 // Load instrument table from GENMIDI lump:
 
+#ifdef RS_RICH_DOOM
+// rs-rich-doom: a GENMIDI lump given directly (csrc/music.c, for tests
+// without a WAD); NULL to read the WAD's.
+const byte *rs_doom_genmidi = NULL;
+static boolean genmidi_from_wad;
+#endif
+
 static boolean LoadInstrumentTable(void)
 {
     byte *lump;
 
+#ifdef RS_RICH_DOOM
+    // rs-rich-doom: no music, rather than reading past the end, when the
+    // WAD has no GENMIDI lump or a short one.
+    genmidi_from_wad = rs_doom_genmidi == NULL;
+    if (!genmidi_from_wad)
+    {
+        lump = (byte *) rs_doom_genmidi;
+    }
+    else
+    {
+        int lumpnum = W_CheckNumForName(DEH_String("genmidi"));
+
+        if (lumpnum < 0
+         || W_LumpLength(lumpnum) < strlen(GENMIDI_HEADER)
+             + (GENMIDI_NUM_INSTRS + GENMIDI_NUM_PERCUSSION)
+             * (sizeof(genmidi_instr_t) + 32))
+        {
+            printf("I_OPL_InitMusic: no usable GENMIDI lump.\n");
+            return false;
+        }
+        lump = W_CacheLumpNum(lumpnum, PU_STATIC);
+    }
+#else
     lump = W_CacheLumpName(DEH_String("genmidi"), PU_STATIC);
+#endif
 
     // DMX does not check header
 
@@ -1616,6 +1647,58 @@ static boolean IsMid(byte *mem, int len)
     return len > 4 && !memcmp(mem, "MThd", 4);
 }
 
+#ifdef RS_RICH_DOOM
+
+// rs-rich-doom: the song is converted and read in memory, with no
+// temporary file.
+
+static void *I_OPL_RegisterSong(void *data, int len)
+{
+    midi_file_t *result = NULL;
+
+    if (!music_initialized || data == NULL || len <= 0)
+    {
+        return NULL;
+    }
+
+    OPL_Lock();
+
+    if (IsMid(data, len) && len < MAXMIDLENGTH)
+    {
+        result = MIDI_LoadFile(data, len);
+    }
+    else
+    {
+        // Assume a MUS file and try to convert
+
+        MEMFILE *instream = mem_fopen_read(data, len);
+        MEMFILE *outstream = mem_fopen_write();
+
+        if (mus2mid(instream, outstream) == 0)
+        {
+            void *outbuf;
+            size_t outbuf_len;
+
+            mem_get_buf(outstream, &outbuf, &outbuf_len);
+            result = MIDI_LoadFile(outbuf, outbuf_len);
+        }
+
+        mem_fclose(instream);
+        mem_fclose(outstream);
+    }
+
+    if (result == NULL)
+    {
+        fprintf(stderr, "I_OPL_RegisterSong: Failed to load MID.\n");
+    }
+
+    OPL_Unlock();
+
+    return result;
+}
+
+#else
+
 static boolean ConvertMus(byte *musdata, int len, char *filename)
 {
     MEMFILE *instream;
@@ -1687,6 +1770,8 @@ static void *I_OPL_RegisterSong(void *data, int len)
     return result;
 }
 
+#endif // RS_RICH_DOOM
+
 // Is the song playing?
 
 static boolean I_OPL_MusicIsPlaying(void)
@@ -1713,6 +1798,9 @@ static void I_OPL_ShutdownMusic(void)
 
         // Release GENMIDI lump
 
+#ifdef RS_RICH_DOOM
+        if (genmidi_from_wad)
+#endif
         W_ReleaseLumpName(DEH_String("genmidi"));
 
         music_initialized = false;
@@ -1779,13 +1867,21 @@ static boolean I_OPL_InitMusic(void)
     return true;
 }
 
+#ifdef RS_RICH_DOOM
+// rs-rich-doom: doomgeneric's i_sound.h declares these without const.
+static snddevice_t music_opl_devices[] =
+#else
 const static snddevice_t music_opl_devices[] =
+#endif
 {
     SNDDEVICE_ADLIB,
     SNDDEVICE_SB,
 };
 
-const music_module_t music_opl_module =
+#ifndef RS_RICH_DOOM
+const
+#endif
+music_module_t music_opl_module =
 {
     music_opl_devices,
     arrlen(music_opl_devices),

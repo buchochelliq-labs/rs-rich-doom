@@ -4,7 +4,8 @@ directory doomgeneric/, upstream commit e257a09527062bfb986b6e5e0780839b6cbd5b71
 
 Kept: the engine sources the upstream Makefile builds, minus the platform
 frontends (doomgeneric_*.c) and the SDL/Allegro sound and music modules
-(i_sdlsound.c, i_sdlmusic.c, i_allegro*.c), plus every header.
+(i_sdlsound.c, i_sdlmusic.c, i_allegro*.c), plus every header, plus
+mus2mid.c (unmodified, same commit), which the OPL music in ../opl uses.
 
 Local changes:
 - i_sound.c: the SDL_mixer include is skipped when RS_RICH_DOOM is defined

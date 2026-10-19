@@ -41,6 +41,9 @@ fn main() {
         clock: Clock::Virtual,
         hold: HoldTimes::default(),
         sound: false,
+        music: false,
+        music_gain: 1.0,
+        headless_audio: false,
     };
     let engine_run = std::thread::spawn(move || {
         let _ = engine::run(

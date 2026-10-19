@@ -64,7 +64,14 @@ extern opl_driver_t opl_openbsd_driver;
 #ifdef _WIN32
 extern opl_driver_t opl_win32_driver;
 #endif
+#ifdef RS_RICH_DOOM
+// rs-rich-doom's software driver (csrc/music.c), and the delay it
+// implements without waiting.
+extern opl_driver_t opl_rs_driver;
+void OPL_RS_Delay(uint64_t us);
+#else
 extern opl_driver_t opl_sdl_driver;
+#endif
 
 
 #endif /* #ifndef OPL_INTERNAL_H */
