@@ -1,0 +1,55 @@
+# rs-rich-doom: Doom (the GPL engine, through doomgeneric) in the terminal,
+# drawn and driven by the rs-rich crates.
+#
+# GPL-2.0-or-later, because the engine it links is. rs-rich itself is MIT and
+# is used here as an ordinary library dependency.
+[package]
+name = "rs-rich-doom"
+version = "0.0.1"
+edition = "2021"
+license = "GPL-2.0-or-later"
+description = "Doom in the terminal: the doomgeneric engine drawn with rs-rich (half blocks, Braille, Kitty, Sixel)"
+repository = "https://github.com/buchochelliq-labs/rs-rich-doom"
+readme = "README.md"
+keywords = ["doom", "terminal", "game", "tui"]
+categories = ["games", "command-line-interface"]
+rust-version = "1.90"
+build = "build.rs"
+# No game data is ever packaged: the IWAD is the user's.
+exclude = ["*.wad", "*.WAD"]
+
+[lib]
+name = "rs_rich_doom"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rs-rich-doom"
+path = "src/main.rs"
+
+[features]
+default = ["sound"]
+# Sound effects through cpal (ALSA on Linux, which needs libasound2-dev to
+# build; CoreAudio on macOS; WASAPI on Windows). Music is not played.
+sound = ["dep:cpal"]
+
+# The rs-rich crates, pinned to one commit of the branch this was written
+# against (claude/next-priority-items-3c5p8e).
+[dependencies]
+rich = { package = "rs-rich", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
+rich-ext = { package = "rs-rich-ext", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1", default-features = false }
+rich-art = { package = "rs-rich-art", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1", features = ["kitty", "sixel", "iterm"] }
+rich-interact = { package = "rs-rich-interact", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
+intuituive = { package = "rs-rich-intuituive", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
+clap = { version = "4", features = ["derive"] }
+cpal = { version = "0.18", optional = true }
+ureq = "3"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+libc = "0.2"
+
+[build-dependencies]
+cc = "1"
+
+[profile.release]
+# The engine is C; Rust's side is the per-frame conversion. Both like -O3.
+opt-level = 3
