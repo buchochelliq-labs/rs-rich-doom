@@ -404,7 +404,10 @@ mod tests {
             },
             100,
         );
-        assert_eq!(drain(&mut s, 100), vec![(true, doom::LEFT), (false, doom::LEFT)]);
+        assert_eq!(
+            drain(&mut s, 100),
+            vec![(true, doom::LEFT), (false, doom::LEFT)]
+        );
         assert!(s.knows_release(doom::LEFT));
         // Now held as long as it is, with no timeout.
         s.input(left, 1000);

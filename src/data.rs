@@ -62,9 +62,11 @@ pub fn find_iwad(explicit: Option<&Path>, dir: Option<&Path>) -> Result<PathBuf,
             }
         }
     }
-    Err("no IWAD: pass --iwad PATH (doom1.wad, doom.wad, doom2.wad, …) \
+    Err(
+        "no IWAD: pass --iwad PATH (doom1.wad, doom.wad, doom2.wad, …) \
          or run `rs-rich-doom fetch-freedoom` to download Freedoom"
-        .into())
+            .into(),
+    )
 }
 
 /// Hex SHA-256 of `bytes`.
@@ -106,7 +108,10 @@ pub fn unpack_freedoom(zip_bytes: &[u8], dir: &Path) -> Result<Vec<PathBuf>, Str
         std::fs::rename(&partial, &target).map_err(|e| format!("{}: {e}", target.display()))?;
         written.push(target);
     }
-    if !written.iter().any(|p| p.extension().is_some_and(|e| e == "wad")) {
+    if !written
+        .iter()
+        .any(|p| p.extension().is_some_and(|e| e == "wad"))
+    {
         return Err("the zip holds no Freedoom IWAD".into());
     }
     Ok(written)
@@ -186,11 +191,19 @@ mod tests {
     #[test]
     fn finds_the_iwad() {
         let dir = scratch("find");
-        assert!(find_iwad(None, Some(&dir)).unwrap_err().contains("fetch-freedoom"));
+        assert!(find_iwad(None, Some(&dir))
+            .unwrap_err()
+            .contains("fetch-freedoom"));
         std::fs::write(dir.join("freedoom2.wad"), b"IWAD").unwrap();
-        assert_eq!(find_iwad(None, Some(&dir)).unwrap(), dir.join("freedoom2.wad"));
+        assert_eq!(
+            find_iwad(None, Some(&dir)).unwrap(),
+            dir.join("freedoom2.wad")
+        );
         std::fs::write(dir.join("freedoom1.wad"), b"IWAD").unwrap();
-        assert_eq!(find_iwad(None, Some(&dir)).unwrap(), dir.join("freedoom1.wad"));
+        assert_eq!(
+            find_iwad(None, Some(&dir)).unwrap(),
+            dir.join("freedoom1.wad")
+        );
         let mine = dir.join("doom1.wad");
         assert!(find_iwad(Some(&mine), Some(&dir)).is_err());
         std::fs::write(&mine, b"IWAD").unwrap();
@@ -220,7 +233,10 @@ mod tests {
         let written = unpack_freedoom(&zip_bytes, &dir).unwrap();
         assert_eq!(written.len(), 2);
         assert_eq!(std::fs::read(dir.join("freedoom1.wad")).unwrap(), b"IWAD1");
-        assert_eq!(std::fs::read(dir.join("FREEDOOM-COPYING.txt")).unwrap(), b"BSD");
+        assert_eq!(
+            std::fs::read(dir.join("FREEDOOM-COPYING.txt")).unwrap(),
+            b"BSD"
+        );
         assert!(!dir.join("README.html").exists());
         assert!(unpack_freedoom(b"nope", &dir).is_err());
         std::fs::remove_dir_all(&dir).unwrap();

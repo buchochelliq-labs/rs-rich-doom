@@ -35,7 +35,10 @@ pub fn pixel_size(rect: CellRect, cell: (u32, u32), max_width: u32) -> (u32, u32
     if w <= max_width {
         (w, h)
     } else {
-        (max_width, ((h as u64 * max_width as u64) / w as u64).max(1) as u32)
+        (
+            max_width,
+            ((h as u64 * max_width as u64) / w as u64).max(1) as u32,
+        )
     }
 }
 
@@ -267,7 +270,9 @@ impl Graphic for Picture {
             Protocol::Sixel => {
                 let (w, h) = pixel_size(self.rect, self.cell, self.max_width);
                 // Nearest neighbour keeps the frame's own 256 colours.
-                let px = Resampler::new().resample(&self.frame, w as usize, h as usize).to_vec();
+                let px = Resampler::new()
+                    .resample(&self.frame, w as usize, h as usize)
+                    .to_vec();
                 let packed: Vec<u32> = px
                     .iter()
                     .map(|p| (p[0] as u32) << 16 | (p[1] as u32) << 8 | p[2] as u32)
@@ -357,10 +362,16 @@ mod tests {
         frame.seq = 7;
         p.show(Arc::new(frame), rect);
         let placed = p.placements(&empty);
-        assert_eq!((placed[0].row, placed[0].column, placed[0].cols), (0, 8, 64));
+        assert_eq!(
+            (placed[0].row, placed[0].column, placed[0].cols),
+            (0, 8, 64)
+        );
         assert!(placed[0].graphic.in_cells());
         let escape = placed[0].graphic.draw(0);
-        assert!(escape.starts_with("\x1b_Ga=T,U=1,f=100,t=d,i="), "{escape:.40}");
+        assert!(
+            escape.starts_with("\x1b_Ga=T,U=1,f=100,t=d,i="),
+            "{escape:.40}"
+        );
         assert!(p.release(&[]).contains("a=d"));
     }
 

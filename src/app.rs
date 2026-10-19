@@ -242,7 +242,11 @@ pub struct Outcome {
 }
 
 /// Build the app.
-pub fn build(options: Options, stats: Arc<Mutex<Stats>>, log: Log) -> (App, Arc<Mutex<Option<Exit>>>) {
+pub fn build(
+    options: Options,
+    stats: Arc<Mutex<Stats>>,
+    log: Log,
+) -> (App, Arc<Mutex<Option<Exit>>>) {
     let exit_slot: Arc<Mutex<Option<Exit>>> = Arc::new(Mutex::new(None));
     let slot = exit_slot.clone();
     let Options {
@@ -286,7 +290,9 @@ pub fn build(options: Options, stats: Arc<Mutex<Stats>>, log: Log) -> (App, Arc<
         if let Some(wait) = quit_after {
             after(wait, |cx| cx.quit());
         }
-        widget(DoomView::new(update, draw, fit, keys, pictures, show_fps, stats))
+        widget(DoomView::new(
+            update, draw, fit, keys, pictures, show_fps, stats,
+        ))
     })
     // Doom's keys are its own: no mouse, no text selection.
     .mouse(Some(false))

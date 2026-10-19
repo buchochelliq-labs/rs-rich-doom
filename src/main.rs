@@ -91,7 +91,9 @@ fn play(cli: Cli) -> Result<ExitCode, String> {
     }
     let dir = data::data_dir();
     let iwad = data::find_iwad(cli.iwad.as_deref(), dir.as_deref())?;
-    let iwad = iwad.canonicalize().map_err(|e| format!("{}: {e}", iwad.display()))?;
+    let iwad = iwad
+        .canonicalize()
+        .map_err(|e| format!("{}: {e}", iwad.display()))?;
     // Doom keeps default.cfg and its saves in the working directory: make
     // that the data directory, not wherever the game was started.
     if let Some(dir) = &dir {

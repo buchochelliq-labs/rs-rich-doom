@@ -106,7 +106,15 @@ mod tests {
     #[test]
     fn options_and_doom_arguments() {
         let cli = parse(&[
-            "--iwad", "/games/doom1.wad", "--mode", "braille", "--fps", "--", "-warp", "1", "3",
+            "--iwad",
+            "/games/doom1.wad",
+            "--mode",
+            "braille",
+            "--fps",
+            "--",
+            "-warp",
+            "1",
+            "3",
         ]);
         assert_eq!(cli.iwad, Some(PathBuf::from("/games/doom1.wad")));
         assert_eq!(cli.mode, Mode::Braille);

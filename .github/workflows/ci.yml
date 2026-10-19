@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: ALSA headers (sound feature)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - uses: Swatinem/rust-cache@v2
+      - name: Freedoom (for the headless engine test)
+        id: freedoom
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/freedoom"
+          cd "$RUNNER_TEMP/freedoom"
+          curl -sSfL -o freedoom.zip https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip
+          echo "3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59  freedoom.zip" | shasum -a 256 -c -
+          unzip -q freedoom.zip
+          echo "RS_RICH_DOOM_IWAD=$RUNNER_TEMP/freedoom/freedoom-0.13.0/freedoom1.wad" >> "$GITHUB_ENV"
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - name: Without sound
+        run: cargo test --no-default-features --lib

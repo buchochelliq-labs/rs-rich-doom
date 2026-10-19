@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rs_rich_doom::engine::{self, Clock, Config, Log};
-use rs_rich_doom::keys::{doom, HoldTimes, Hold, Input};
+use rs_rich_doom::keys::{doom, Hold, HoldTimes, Input};
 use rs_rich_doom::render::{cells, CellMode, Fit, Frame, Resampler};
 
 /// Enough for the title, the menu and the first demo's start.
@@ -56,7 +56,12 @@ fn runs_tics_headless_and_draws_frames() {
     });
     let result = done_rx
         .recv_timeout(Duration::from_secs(120))
-        .unwrap_or_else(|_| panic!("the tics did not finish; the engine said:\n{}", log.tail(30)));
+        .unwrap_or_else(|_| {
+            panic!(
+                "the tics did not finish; the engine said:\n{}",
+                log.tail(30)
+            )
+        });
     result.unwrap();
 
     let frames = frames.lock().unwrap();
@@ -79,6 +84,11 @@ fn runs_tics_headless_and_draws_frames() {
     let place = Fit::default().place(80, 24);
     let mut resampler = Resampler::new();
     let px = resampler.resample(last, place.cols as usize, place.rows as usize * 2);
-    let lines = cells(px, place.cols as usize, place.rows as usize, CellMode::HalfBlocks);
+    let lines = cells(
+        px,
+        place.cols as usize,
+        place.rows as usize,
+        CellMode::HalfBlocks,
+    );
     assert_eq!(lines.len(), 24);
 }

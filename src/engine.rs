@@ -287,7 +287,9 @@ extern "C" fn rs_doom_set_title(title: *const c_char) {
         return;
     }
     // SAFETY: a NUL-terminated string from the engine.
-    let title = unsafe { CStr::from_ptr(title) }.to_string_lossy().into_owned();
+    let title = unsafe { CStr::from_ptr(title) }
+        .to_string_lossy()
+        .into_owned();
     with_host(|host| host.title = title);
 }
 

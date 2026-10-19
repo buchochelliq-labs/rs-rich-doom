@@ -57,7 +57,14 @@ impl Mixer {
         }
     }
 
-    pub fn start(&mut self, channel: usize, samples: std::sync::Arc<[u8]>, rate: u32, vol: i32, sep: i32) {
+    pub fn start(
+        &mut self,
+        channel: usize,
+        samples: std::sync::Arc<[u8]>,
+        rate: u32,
+        vol: i32,
+        sep: i32,
+    ) {
         if self.voices.len() <= channel {
             self.voices.resize(channel + 1, None);
         }
@@ -242,7 +249,11 @@ mod device {
     #[no_mangle]
     extern "C" fn rs_doom_sound_playing(channel: c_int) -> c_int {
         let playing = match (output(), usize::try_from(channel)) {
-            (Some(out), Ok(channel)) => out.mixer.lock().map(|m| m.playing(channel)).unwrap_or(false),
+            (Some(out), Ok(channel)) => out
+                .mixer
+                .lock()
+                .map(|m| m.playing(channel))
+                .unwrap_or(false),
             _ => false,
         };
         c_int::from(playing)

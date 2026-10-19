@@ -19,7 +19,9 @@ use rs_rich_doom::render::{CellMode, Fit, Frame};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let iwad = args.first().expect("usage: draw_bench IWAD [COLS ROWS] [MODE]");
+    let iwad = args
+        .first()
+        .expect("usage: draw_bench IWAD [COLS ROWS] [MODE]");
     let cols: u16 = args.get(1).and_then(|a| a.parse().ok()).unwrap_or(80);
     let rows: u16 = args.get(2).and_then(|a| a.parse().ok()).unwrap_or(24);
     let draw = match args.get(3).map(String::as_str).unwrap_or("half") {
@@ -73,7 +75,15 @@ fn main() {
             update.update(|u| *u = Some(Update::Frame(frame)));
             next += 1;
         });
-        widget(DoomView::new(update, draw, Fit::default(), keys, source, false, stats))
+        widget(DoomView::new(
+            update,
+            draw,
+            Fit::default(),
+            keys,
+            source,
+            false,
+            stats,
+        ))
     });
     if let Some(p) = pictures {
         app = app.graphics(p as Arc<dyn rich_ext::frame::PlacementSource>);

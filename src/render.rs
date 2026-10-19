@@ -87,7 +87,9 @@ impl Fit {
         let (c, r) = if want_cols <= cols as f64 {
             (want_cols as u16, rows)
         } else {
-            let want_rows = (cols as f64 / (cell * aspect)).round().clamp(1.0, rows as f64);
+            let want_rows = (cols as f64 / (cell * aspect))
+                .round()
+                .clamp(1.0, rows as f64);
             (cols, want_rows as u16)
         };
         CellRect {
@@ -202,7 +204,13 @@ fn color([r, g, b]: [u8; 3]) -> Color {
 
 /// Appends a cell to a line, merging it into the last segment when both
 /// have the same colours (fewer segments, fewer style changes on the wire).
-fn push_cell(line: &mut Vec<Segment>, last: &mut Option<(u32, u32)>, text: char, fg: [u8; 3], bg: [u8; 3]) {
+fn push_cell(
+    line: &mut Vec<Segment>,
+    last: &mut Option<(u32, u32)>,
+    text: char,
+    fg: [u8; 3],
+    bg: [u8; 3],
+) {
     let pack = |[r, g, b]: [u8; 3]| (r as u32) << 16 | (g as u32) << 8 | b as u32;
     let key = (pack(fg), pack(bg));
     if *last == Some(key) {
@@ -305,11 +313,7 @@ fn representative(group: &[[u8; 3]]) -> [u8; 3] {
     }
     let mean = [sum[0] / n, sum[1] / n, sum[2] / n];
     let distance = |p: &[u8; 3]| -> i32 { (0..3).map(|c| (p[c] as i32 - mean[c]).pow(2)).sum() };
-    group
-        .iter()
-        .copied()
-        .min_by_key(distance)
-        .unwrap_or(first)
+    group.iter().copied().min_by_key(distance).unwrap_or(first)
 }
 
 #[cfg(test)]
@@ -436,7 +440,12 @@ mod tests {
         let fit = Fit::default().place(80, 24);
         let mut r = Resampler::new();
         let px = r.resample(&frame, fit.cols as usize, fit.rows as usize * 2);
-        let lines = cells(px, fit.cols as usize, fit.rows as usize, CellMode::HalfBlocks);
+        let lines = cells(
+            px,
+            fit.cols as usize,
+            fit.rows as usize,
+            CellMode::HalfBlocks,
+        );
         assert_eq!(lines.len(), 24);
         let width: usize = lines[5].iter().map(|s| s.text.chars().count()).sum();
         assert_eq!(width, 64);
