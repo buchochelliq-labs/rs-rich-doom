@@ -2,6 +2,10 @@
 
 ![Freedoom's first demo in half blocks, recorded with rs-rich-record](docs/media/doom-half/doom-half.gif)
 
+**[Watch it with sound](docs/media/doom-play.mp4)** (30 s, MP4: the first demo
+in half blocks at 160x45 in xterm, with the game's effects and OPL music;
+made by [docs/media/play/record.sh](docs/media/play/record.sh)).
+
 *Freedoom's first demo (`-- -playdemo demo1`) in half blocks, 100x32, 35
 frames a second; also [in Kitty graphics](docs/media/doom-kitty/doom-kitty.gif)
 and as animated PNGs ([half blocks](docs/media/doom-half/doom-half.apng),
