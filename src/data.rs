@@ -331,6 +331,23 @@ mod tests {
         std::fs::remove_dir_all(&here).unwrap();
     }
 
+    /// The real release, when `RS_RICH_DOOM_FREEDOOM_ZIP` names it (CI
+    /// downloads it): its checksum, and unpacking its deflated IWADs.
+    #[test]
+    fn unpacks_the_real_release() {
+        let Some(zip) = std::env::var_os("RS_RICH_DOOM_FREEDOOM_ZIP") else {
+            return;
+        };
+        let bytes = std::fs::read(zip).unwrap();
+        assert_eq!(sha256_hex(&bytes), FREEDOOM_SHA256);
+        let dir = scratch("real");
+        let written = unpack_freedoom(&bytes, &dir).unwrap();
+        assert_eq!(written.len(), 3, "{written:?}");
+        let wad = std::fs::read(dir.join("freedoom1.wad")).unwrap();
+        assert_eq!(&wad[..4], b"IWAD");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn hashes() {
         assert_eq!(

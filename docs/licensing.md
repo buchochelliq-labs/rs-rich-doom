@@ -1,0 +1,171 @@
+# Licensing and trademark review
+
+Reviewed on 2026-10-25 for the tree on branch `claude/next-priority-items-3c5p8e`
+(the rs-rich 0.0.21 crates from crates.io). It is a factual review for the
+maintainer, not legal advice. Items that need the maintainer's decision are
+marked **Decision**.
+
+## Summary
+
+- The source is **GPL-2.0-or-later** and every component's licence lets it be.
+- A **built binary** also contains Apache-2.0-only Rust code: cpal, the audio
+  library behind the default `sound` feature, and ring, the cryptography under
+  the HTTPS client `fetch-freedoom` uses. Apache-2.0 is compatible with GPLv3
+  but not with GPLv2. So **every binary this tree builds can be distributed
+  only under GPL-3.0-or-later**, which the "or later" allows. This holds with
+  or without sound, because ring is always in.
+- **No game data is committed.** The screenshots, GIF and APNG animations, the
+  MP4 and the tapes all show Freedoom (BSD-3-Clause), not id Software's data.
+  Freedoom's notice now sits next to the footage in
+  [`docs/media/FREEDOOM-COPYING.txt`](media/FREEDOOM-COPYING.txt).
+- `fetch-freedoom` downloads from Freedoom's official GitHub release and checks
+  a pinned SHA-256 before unpacking.
+- The README now says the project is not affiliated with or endorsed by id
+  Software or ZeniMax, and that DOOM is their trademark.
+
+## Components
+
+### Vendored C
+
+| Component | Where | Licence | Notes |
+|---|---|---|---|
+| Doom engine (id Software's 1997/1999 source release, via Chocolate Doom) through doomgeneric | `doomgeneric/` | GPL-2.0-or-later (file headers say "version 2 … or (at your option) any later version"); `doomgeneric/LICENSE` is GPLv2's text | `doomgeneric.c` and `dummy.c` (ozkl's) have no header; they are covered by doomgeneric's GPLv2 `LICENSE`. One local change, recorded in `doomgeneric/NOTE`. |
+| Chocolate Doom's OPL music module and OPL library | `opl/` (`i_oplmusic.c`, `midifile.*`, `opl.*`, `opl_queue.*`, `opl_internal.h`) | GPL-2.0-or-later (`opl/COPYING.md`) | Local changes under `#ifdef RS_RICH_DOOM`, listed in `opl/NOTE`. |
+| Nuked OPL3 (with Chocolate Doom's "Nuked-OPL3-fast" changes) | `opl/opl3.c`, `opl3.h`, `wf_rom.h` | **LGPL-2.1-or-later** (checked: the headers say "either version 2.1 of the License, or (at your option) any later version"); the full text is `opl/LICENSE.LGPL-2.1` | `wf_rom.h` holds the OPL waveform ROM tables, part of Nuked OPL3's distribution. |
+| This port's C | `csrc/`, `opl/rs_compat.h` | GPL-2.0-or-later | `csrc/sound.c`'s lump parsing follows Chocolate Doom's `i_sdlsound.c` (GPL-2.0-or-later), as its header says. |
+
+`mus2mid.c` is in `doomgeneric/` and shares its licence.
+
+### Rust dependencies
+
+From `cargo metadata` for every normal and build dependency on all targets with
+the default features: 234 crates. (`cargo license` and `cargo deny` were not
+installed. The licences are the `license` field each crate declares.)
+
+| Licence expression | Crates | Compatible with GPL-2.0-or-later? |
+|---|---:|---|
+| MIT OR Apache-2.0 (and the `/` spellings) | 157 | Yes, under MIT |
+| MIT (rs-rich, rs-rich-ext, rs-rich-art, rs-rich-interact, rs-rich-intuituive, rs-rich-plugin-api, crossterm, alsa-sys, zip, syntect, …) | 38 | Yes |
+| Zlib, or Zlib/MIT/Apache choices (bytemuck, miniz_oxide, zlib-rs, foldhash, zune-*, objc2 audio bindings, …) | 16 | Yes |
+| Unlicense OR MIT | 6 | Yes |
+| BSD-2/3-Clause or a choice with MIT (num_enum, moxcms, pxfm, mach2, subtle) | 6 | Yes |
+| Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT (rustix, linux-raw-sys, wasi) | 3 | Yes, under MIT |
+| ISC (rustls-webpki, untrusted); Apache-2.0 OR ISC OR MIT (rustls); 0BSD OR … (adler2) | 4 | Yes |
+| (MIT OR Apache-2.0) AND Unicode-3.0 (unicode-ident) | 1 | Yes. Unicode-3.0 is permissive. |
+| CDLA-Permissive-2.0 (webpki-roots: Mozilla's root certificates as data) | 1 | Yes, in practice: permissive. It asks that the agreement's text be made available with the data. |
+| **Apache-2.0 only: cpal** (audio, the `sound` feature) | 1 | **Only under GPLv3** |
+| **Apache-2.0 AND ISC: ring** (via rustls and ureq, for `fetch-freedoom`) | 1 | **Only under GPLv3** |
+
+Fixed in this review: **zopfli** (Apache-2.0 only) came in through the `zip`
+crate's `deflate` feature, which includes a compressor. `fetch-freedoom` only
+reads, so the dependency is now `deflate-flate2-zlib-rs`, a decompressor under
+the Zlib licence, and zopfli is gone.
+
+The crates that only build on other targets (WASAPI, CoreAudio, Android's NDK
+and JNI) are in the counts and have the same kinds of licences.
+
+## Compatibility
+
+The program is GPL-2.0-or-later, so a recipient may take it under GPLv2 or
+under GPLv3 (or later).
+
+- **GPLv2 and Apache-2.0 are incompatible.** The FSF's reading is that
+  Apache-2.0's patent-termination and indemnity terms are "further
+  restrictions" GPLv2 forbids. A binary containing Apache-2.0-only code
+  therefore cannot be distributed under GPLv2.
+- **GPLv3 and Apache-2.0 are compatible.** GPLv3 was written to allow it.
+- **LGPL-2.1-or-later** (Nuked OPL3) may be combined with GPL code under
+  either GPL version. Section 3 of LGPL-2.1 even lets it be relicensed to
+  the GPL.
+- Everything else is permissive and compatible with both.
+
+Which builds force GPLv3:
+
+| Build | Apache-2.0-only code linked | Binary distributable under |
+|---|---|---|
+| default (`sound`) | cpal, ring | GPL-3.0-or-later only |
+| `--no-default-features` | ring | GPL-3.0-or-later only |
+| `pulse` | cpal, ring | GPL-3.0-or-later only |
+| hypothetical: no `sound` and no HTTPS client | none | GPL-2.0-or-later |
+
+The **source** stays GPL-2.0-or-later. Nothing Apache-only is vendored; the
+Rust dependencies are fetched by Cargo.
+
+**Decision:**
+1. Say in the README and on any binary release that binaries are
+   distributed under GPL-3.0-or-later. A line pointing here was added to the
+   README's licence section; the maintainer may want stronger wording.
+2. Or keep a GPLv2-distributable binary possible: make the downloader
+   optional (a feature, or shell out to `curl`) and audio optional (it is
+   already). That is a code change this review did not make.
+
+## Required notices
+
+| Notice | Status |
+|---|---|
+| GPL text | `LICENSE` (GPLv2), `doomgeneric/LICENSE`, `opl/COPYING.md`. Because binaries are GPLv3 (above), **Decision:** add GPLv3's text (`COPYING-GPL-3`) to the repository and to any binary archive. |
+| GPL source offer | Only needed when binaries are distributed. Today the project is installed from source (`cargo install --git`), which complies by itself. A binary release must ship the corresponding source alongside (simplest: link the exact tag) or a written offer (GPLv3 §6). |
+| LGPL relinking (Nuked OPL3) | Statically linked. LGPL-2.1 §6 is met by giving the complete corresponding source of the whole program, which the GPL already requires. Nothing more is needed while the whole program is source-available under the GPL. |
+| Permissive Rust crates (MIT, BSD, ISC, Zlib, Unicode, CDLA) | Their licence texts must accompany **binary** distributions. There is no third-party notice file yet. **Decision:** for binary releases, generate one (`cargo about generate` or `cargo deny`'s licence listing) and ship it. |
+| Freedoom (BSD-3-Clause), for the footage | The GIFs, APNGs, MP4 and `.ans` screenshots are renderings of Freedoom's art and music. **Fixed:** `docs/media/FREEDOOM-COPYING.txt` is Freedoom 0.13.0's `COPYING.txt`, and the README links it. The README credits Freedoom correctly as BSD-licensed. Its third clause forbids using Freedoom's name to endorse or promote the product; the README uses it only to say what the footage shows. |
+| Freedoom, for the downloaded IWADs | `fetch-freedoom` writes Freedoom's own `COPYING.txt` next to the IWADs as `FREEDOOM-COPYING.txt`. |
+
+## No game data in the repository
+
+- `.gitignore` and the crate's `exclude` keep `*.wad` and `*.WAD` out.
+- No tracked file starts with an `IWAD` or `PWAD` header (checked over every
+  tracked file).
+- The footage was checked by eye. The GIFs and APNGs in `docs/media/doom-half`
+  and `docs/media/doom-kitty`, and the new `docs/media/doom-play.mp4`, show
+  Freedoom's first demo: Freedoom's status-bar face, weapons and textures, not
+  id's. The `.ans` screenshots are the same demo; the README's brightness
+  rendering of one shows the same scene. The tapes run
+  `--iwad "$REPO/freedoom1.wad" -- -playdemo demo1`, and `record.sh` takes
+  Freedoom's `freedoom1.wad` as its argument.
+- The on-screen messages ("PICKED UP A CLIP.") come from the GPL engine's
+  string table (`d_englsh.h`), not from game data.
+
+## `fetch-freedoom`
+
+- URL: `https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip`,
+  the Freedoom project's own GitHub release (freedoom.github.io links there).
+- The zip's SHA-256 is pinned (`3f9b264f…9688f59`) and checked before
+  anything is unpacked. Only `freedoom1.wad`, `freedoom2.wad` and
+  `COPYING.txt` are extracted, by file name, so a path in the zip cannot
+  escape the data directory (`enclosed_name`). A test covers a hostile
+  `../evil.wad`.
+- Verified here: the same URL fetched with curl has exactly that SHA-256,
+  and `data::tests::unpacks_the_real_release` unpacks it
+  (`RS_RICH_DOOM_FREEDOOM_ZIP=…`; CI now runs it). The binary's own download
+  failed in this sandbox: ureq trusts only webpki-roots' bundled Mozilla
+  roots, and the sandbox's HTTPS proxy signs with its own CA. That is an
+  environment limit, but users behind a corporate TLS proxy would hit it too.
+  **Decision:** whether to enable ureq's platform verifier (the system's
+  certificate store).
+
+## The "DOOM" trademark
+
+"DOOM" is a registered trademark of id Software LLC, a ZeniMax Media company
+(Microsoft). Source ports that use the name commonly carry a non-affiliation
+disclaimer, among them Chocolate Doom, PrBoom+, GZDoom and doomgeneric's
+derivatives. The engine's GPL licence covers the code, not the mark.
+
+- **Fixed:** the README now carries a disclaimer: "DOOM is a registered
+  trademark of id Software LLC, a ZeniMax Media company. rs-rich-doom is not
+  affiliated with or endorsed by id Software, ZeniMax or Microsoft."
+- **Recommendation, not a rename:** the name `rs-rich-doom` uses the mark
+  descriptively, for a port of the released Doom engine, as many ports do
+  ("chocolate-doom", "doomgeneric"). Keep the disclaimer prominent. Don't use
+  id's logo or box art. Keep Freedoom the default data. Don't describe the
+  project as "official" or as "DOOM" alone. **Decision:** the maintainer may
+  still prefer a name without the mark for a crates.io publication, where the
+  name is the product's identity.
+
+## Decisions for the maintainer
+
+1. State that binaries are GPL-3.0-or-later, and add GPLv3's text; or make
+   the HTTPS downloader optional so a GPLv2 binary is possible.
+2. Generate a third-party notices file for any binary release.
+3. Whether `fetch-freedoom` should trust the system's certificate store.
+4. Whether to keep the name `rs-rich-doom` (with the disclaimer) for a
+   crates.io release.

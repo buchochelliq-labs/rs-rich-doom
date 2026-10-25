@@ -46,7 +46,8 @@ rich-interact = { package = "rs-rich-interact", version = "0.0.9" }
 intuituive = { package = "rs-rich-intuituive", version = "0.0.6" }
 clap = { version = "4", features = ["derive"] }
 ureq = "3"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+# Reading only: flate2 on zlib-rs (Zlib licence), not zopfli (Apache-2.0).
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sha2 = "0.10"
 libc = "0.2"
 

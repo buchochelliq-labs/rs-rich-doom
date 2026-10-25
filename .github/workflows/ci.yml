@@ -35,6 +35,7 @@ jobs:
           echo "3f9b264f3e3ce503b4fb7f6bdcb1f419d93c7b546f4df3e874dd878db9688f59  freedoom.zip" | shasum -a 256 -c -
           unzip -q freedoom.zip
           echo "RS_RICH_DOOM_IWAD=$RUNNER_TEMP/freedoom/freedoom-0.13.0/freedoom1.wad" >> "$GITHUB_ENV"
+          echo "RS_RICH_DOOM_FREEDOOM_ZIP=$RUNNER_TEMP/freedoom/freedoom.zip" >> "$GITHUB_ENV"
       - run: cargo fmt --all -- --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
