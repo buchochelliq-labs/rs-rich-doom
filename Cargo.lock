@@ -1265,8 +1265,9 @@ dependencies = [
 
 [[package]]
 name = "rs-rich"
-version = "0.0.9"
-source = "git+https://github.com/buchochelliq-labs/rs-rich-cli?rev=866b897a91e8ce05b1325685abffca15cbf612b1#866b897a91e8ce05b1325685abffca15cbf612b1"
+version = "0.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96b1f16f39972631a9ffe4dacce2ed852ff20cc728283a6c8f2c9ffea0ae6694"
 dependencies = [
  "anstyle-query",
  "fancy-regex 0.19.2",
@@ -1278,8 +1279,9 @@ dependencies = [
 
 [[package]]
 name = "rs-rich-art"
-version = "0.0.12"
-source = "git+https://github.com/buchochelliq-labs/rs-rich-cli?rev=866b897a91e8ce05b1325685abffca15cbf612b1#866b897a91e8ce05b1325685abffca15cbf612b1"
+version = "0.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f925f433bc7da3ecec7f7710bbd7e624e05e9f45144006b8dcfb889aa09c394"
 dependencies = [
  "icy_sixel",
  "image",
@@ -1306,8 +1308,9 @@ dependencies = [
 
 [[package]]
 name = "rs-rich-ext"
-version = "0.0.17"
-source = "git+https://github.com/buchochelliq-labs/rs-rich-cli?rev=866b897a91e8ce05b1325685abffca15cbf612b1#866b897a91e8ce05b1325685abffca15cbf612b1"
+version = "0.0.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29465b0453af02452aa7401771b93e893e9d3e9610a5e22f61b64cefd269e172"
 dependencies = [
  "fancy-regex 0.19.2",
  "libc",
@@ -1320,21 +1323,25 @@ dependencies = [
 
 [[package]]
 name = "rs-rich-interact"
-version = "0.0.8"
-source = "git+https://github.com/buchochelliq-labs/rs-rich-cli?rev=866b897a91e8ce05b1325685abffca15cbf612b1#866b897a91e8ce05b1325685abffca15cbf612b1"
+version = "0.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e24ecbd085cece3ee54c514591b2f50b02368b3023e29dc16ccad649fb77064"
 dependencies = [
  "crossterm",
+ "fancy-regex 0.19.2",
  "filedescriptor",
  "libc",
  "rs-rich",
  "rs-rich-ext",
  "signal-hook",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "rs-rich-intuituive"
-version = "0.0.5"
-source = "git+https://github.com/buchochelliq-labs/rs-rich-cli?rev=866b897a91e8ce05b1325685abffca15cbf612b1#866b897a91e8ce05b1325685abffca15cbf612b1"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed443c9859ad78912734238bbe9106e305cdb9eb5e06d39aaf0b022490ba6731"
 dependencies = [
  "kasuari",
  "rs-rich",
@@ -1344,8 +1351,9 @@ dependencies = [
 
 [[package]]
 name = "rs-rich-plugin-api"
-version = "0.0.3"
-source = "git+https://github.com/buchochelliq-labs/rs-rich-cli?rev=866b897a91e8ce05b1325685abffca15cbf612b1#866b897a91e8ce05b1325685abffca15cbf612b1"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcceb285b30496957a37bf90f2e8a42207a7435b893479a4686ccfa1d27c19fe"
 dependencies = [
  "inventory",
  "rs-rich",

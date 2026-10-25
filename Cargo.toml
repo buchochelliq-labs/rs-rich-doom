@@ -33,14 +33,13 @@ default = ["sound"]
 # synthesis (opl/, Chocolate Doom's OPL module and Nuked OPL3).
 sound = ["dep:cpal"]
 
-# The rs-rich crates, pinned to one commit of the branch this was written
-# against (claude/next-priority-items-3c5p8e).
+# The rs-rich crates, from crates.io: the 0.0.21 cohort.
 [dependencies]
-rich = { package = "rs-rich", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
-rich-ext = { package = "rs-rich-ext", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1", default-features = false }
-rich-art = { package = "rs-rich-art", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1", features = ["kitty", "sixel", "iterm"] }
-rich-interact = { package = "rs-rich-interact", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
-intuituive = { package = "rs-rich-intuituive", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
+rich = { package = "rs-rich", version = "0.0.11" }
+rich-ext = { package = "rs-rich-ext", version = "0.0.18", default-features = false }
+rich-art = { package = "rs-rich-art", version = "0.0.14", features = ["kitty", "sixel", "iterm"] }
+rich-interact = { package = "rs-rich-interact", version = "0.0.9" }
+intuituive = { package = "rs-rich-intuituive", version = "0.0.6" }
 clap = { version = "4", features = ["derive"] }
 cpal = { version = "0.18", optional = true }
 ureq = "3"
