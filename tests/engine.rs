@@ -134,4 +134,5 @@ fn runs_tics_headless_and_draws_frames() {
             log.tail(200)
         );
     }
+    std::fs::remove_dir_all(&dir).ok();
 }
