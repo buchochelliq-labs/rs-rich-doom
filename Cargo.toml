@@ -1,8 +1,11 @@
 # rs-rich-doom: Doom (the GPL engine, through doomgeneric) in the terminal,
 # drawn and driven by the rs-rich crates.
 #
-# GPL-2.0-or-later, because the engine it links is. rs-rich itself is MIT and
-# is used here as an ordinary library dependency.
+# The source is GPL-2.0-or-later, because the engine it links is; `license`
+# describes this package, which is source. Built binaries are
+# GPL-3.0-or-later (LICENSE-GPL-3.0): they also link Apache-2.0-only crates
+# (cpal, ring). See docs/licensing.md. rs-rich itself is MIT and is used here
+# as an ordinary library dependency.
 [package]
 name = "rs-rich-doom"
 version = "0.0.1"
@@ -45,7 +48,9 @@ rich-art = { package = "rs-rich-art", version = "0.0.14", features = ["kitty", "
 rich-interact = { package = "rs-rich-interact", version = "0.0.9" }
 intuituive = { package = "rs-rich-intuituive", version = "0.0.6" }
 clap = { version = "4", features = ["derive"] }
-ureq = "3"
+# The system's certificate store first (a corporate or sandbox proxy's CA
+# is there), Mozilla's bundled roots as the fallback.
+ureq = { version = "3.4", features = ["platform-verifier"] }
 # Reading only: flate2 on zlib-rs (Zlib licence), not zopfli (Apache-2.0).
 zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sha2 = "0.10"

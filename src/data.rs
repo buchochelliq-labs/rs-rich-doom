@@ -11,6 +11,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
+use ureq::tls::{RootCerts, TlsConfig};
 
 /// The Freedoom release fetched.
 pub const FREEDOOM_VERSION: &str = "0.13.0";
@@ -164,6 +165,19 @@ pub fn unpack_freedoom(zip_bytes: &[u8], dir: &Path) -> Result<Vec<PathBuf>, Str
     Ok(written)
 }
 
+/// The body at `url` (at most 64 MiB), trusting `roots`.
+fn download(url: &str, roots: RootCerts) -> Result<Vec<u8>, String> {
+    let tls = TlsConfig::builder().root_certs(roots).build();
+    let agent: ureq::Agent = ureq::Agent::config_builder().tls_config(tls).build().into();
+    let mut response = agent.get(url).call().map_err(|e| e.to_string())?;
+    response
+        .body_mut()
+        .with_config()
+        .limit(64 * 1024 * 1024)
+        .read_to_vec()
+        .map_err(|e| e.to_string())
+}
+
 /// Download Freedoom into `dir` (unless it is there and not `force`).
 pub fn fetch_freedoom(dir: &Path, force: bool) -> Result<Vec<PathBuf>, String> {
     if !force {
@@ -177,15 +191,13 @@ pub fn fetch_freedoom(dir: &Path, force: bool) -> Result<Vec<PathBuf>, String> {
         }
     }
     eprintln!("Downloading Freedoom {FREEDOOM_VERSION} from {FREEDOOM_URL} …");
-    let mut response = ureq::get(FREEDOOM_URL)
-        .call()
-        .map_err(|e| format!("download failed: {e}"))?;
-    let bytes = response
-        .body_mut()
-        .with_config()
-        .limit(64 * 1024 * 1024)
-        .read_to_vec()
-        .map_err(|e| format!("download failed: {e}"))?;
+    // Trusting the system's certificates first; the roots built in if
+    // that fails (no store, or a store that does not know the server).
+    let bytes = download(FREEDOOM_URL, RootCerts::PlatformVerifier).or_else(|system| {
+        download(FREEDOOM_URL, RootCerts::WebPki).map_err(|bundled| {
+            format!("download failed: {system} (with the system's certificates); {bundled}")
+        })
+    })?;
     let digest = sha256_hex(&bytes);
     if digest != FREEDOOM_SHA256 {
         return Err(format!(

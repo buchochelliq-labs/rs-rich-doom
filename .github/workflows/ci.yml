@@ -41,3 +41,20 @@ jobs:
       - run: cargo test
       - name: Without sound
         run: cargo test --no-default-features
+
+  # The notices every binary release ships (docs/licensing.md): generated
+  # from about.toml and about.hbs, failing on a licence not accepted there.
+  notices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - name: THIRD-PARTY-NOTICES
+        run: cargo about generate --locked --fail about.hbs -o THIRD-PARTY-NOTICES.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: THIRD-PARTY-NOTICES
+          path: THIRD-PARTY-NOTICES.html

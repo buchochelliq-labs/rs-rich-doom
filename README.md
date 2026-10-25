@@ -47,11 +47,14 @@ dependency and stays MIT. The vendored engine is in
 [`doomgeneric/`](doomgeneric) with its licence and a [NOTE](doomgeneric/NOTE)
 of the upstream commit and the one local change.
 
-Built binaries also link Apache-2.0-only Rust code (cpal for sound, ring
-for HTTPS), which GPLv2 does not allow but GPLv3 does, so a binary is
-distributed under GPL-3.0-or-later, as the "or later" permits. See
-[docs/licensing.md](docs/licensing.md) for every component's licence, the
-notices, and the decisions still open.
+**Binaries are GPL-3.0-or-later** ([`LICENSE-GPL-3.0`](LICENSE-GPL-3.0)).
+They link Apache-2.0-only Rust code (cpal for sound, ring for HTTPS), which
+GPLv3 allows and GPLv2 does not; the "or later" permits it. The source
+stays GPL-2.0-or-later. A binary release ships `LICENSE-GPL-3.0` and
+`THIRD-PARTY-NOTICES.html`, which
+`cargo about generate --locked --fail about.hbs -o THIRD-PARTY-NOTICES.html`
+writes (CI checks it on every push). Every component's licence is in
+[docs/licensing.md](docs/licensing.md).
 
 **No game data is included.** Play the shareware `doom1.wad`, an IWAD you
 own (`doom.wad`, `doom2.wad`, `plutonia.wad`, `tnt.wad`), or
