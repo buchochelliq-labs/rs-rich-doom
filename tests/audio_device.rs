@@ -72,6 +72,16 @@ impl Tap {
     }
 }
 
+/// Removes the temporary home (the FIFO, the ALSA config) when the test
+/// ends, passed or failed.
+struct Cleanup(std::path::PathBuf);
+
+impl Drop for Cleanup {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
 /// Left-channel samples that are not silence.
 fn sounding(samples: &[f32]) -> usize {
     samples.iter().step_by(2).filter(|s| **s != 0.0).count()
@@ -81,6 +91,7 @@ fn sounding(samples: &[f32]) -> usize {
 fn effects_reach_the_device_and_mute_silences_them() {
     let home = std::env::temp_dir().join(format!("rs-rich-doom-alsa-{}", std::process::id()));
     std::fs::create_dir_all(&home).unwrap();
+    let _cleanup = Cleanup(home.clone());
     let fifo = home.join("tap.raw");
     let made = std::process::Command::new("mkfifo").arg(&fifo).status();
     assert!(made.is_ok_and(|s| s.success()), "mkfifo");
@@ -173,5 +184,4 @@ fn effects_reach_the_device_and_mute_silences_them() {
         all.len() as f64 / 2.0 / f64::from(RATE),
         sounding(&all),
     );
-    std::fs::remove_dir_all(&home).ok();
 }
