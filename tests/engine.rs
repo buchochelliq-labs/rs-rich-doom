@@ -7,9 +7,10 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use intuituive::pixels::PixelBuf;
 use rs_rich_doom::engine::{self, Clock, Config, Log};
-use rs_rich_doom::keys::{doom, Hold, HoldTimes, Input};
-use rs_rich_doom::render::{cells, CellMode, Fit, Frame, Resampler};
+use rs_rich_doom::keys::{doom, Input};
+use rs_rich_doom::render::{draw_into, CellMode, Fit, Frame, Resampler};
 use rs_rich_doom::sound;
 
 /// Enough for the title, the menu and the first demo's start.
@@ -18,6 +19,11 @@ const TICS: u64 = 400;
 #[test]
 fn runs_tics_headless_and_draws_frames() {
     let Some(iwad) = std::env::var_os("RS_RICH_DOOM_IWAD") else {
+        // CI sets RS_RICH_DOOM_REQUIRE_IWAD, so a skip there fails.
+        assert!(
+            std::env::var_os("RS_RICH_DOOM_REQUIRE_IWAD").is_none(),
+            "RS_RICH_DOOM_IWAD is not set"
+        );
         eprintln!("RS_RICH_DOOM_IWAD is not set: skipped");
         return;
     };
@@ -34,17 +40,13 @@ fn runs_tics_headless_and_draws_frames() {
     std::thread::spawn(move || {
         let (keys, input) = mpsc::channel();
         // Press Escape a little in: the menu opens over the demo.
-        keys.send(Input::Down {
-            key: doom::ESCAPE,
-            hold: Hold::Tap,
-        })
-        .unwrap();
+        keys.send(Input::Down(doom::ESCAPE)).unwrap();
+        keys.send(Input::Up(doom::ESCAPE)).unwrap();
         let result = engine::run(
             Config {
                 iwad,
                 args: Vec::new(),
                 clock: Clock::Virtual,
-                hold: HoldTimes::default(),
                 sound: false,
                 music: true,
                 music_gain: 1.0,
@@ -85,17 +87,16 @@ fn runs_tics_headless_and_draws_frames() {
     assert!(distinct.len() > 10, "{} distinct frames", distinct.len());
     assert!(log.tail(50).contains("R_Init"), "{}", log.tail(50));
 
-    // And it converts to cells.
-    let place = Fit::default().place(80, 24);
-    let mut resampler = Resampler::new();
-    let px = resampler.resample(last, place.cols as usize, place.rows as usize * 2);
-    let lines = cells(
-        px,
-        place.cols as usize,
-        place.rows as usize,
-        CellMode::HalfBlocks,
+    // And it fits a buffer of half-block cells.
+    let mut buf = PixelBuf::new(80, 48);
+    let place = draw_into(
+        &mut buf,
+        last,
+        &Fit::default(),
+        CellMode::HalfBlocks.cell(),
+        &mut Resampler::new(),
     );
-    assert_eq!(lines.len(), 24);
+    assert_eq!((place.cols, place.rows), (64, 24));
 
     // The music the engine started (the first demo's level by now), made
     // without a device: three seconds of it, in 10 ms blocks as an audio

@@ -28,10 +28,14 @@ path = "src/main.rs"
 
 [features]
 default = ["sound"]
-# Sound effects through cpal (ALSA on Linux, which needs libasound2-dev to
-# build; CoreAudio on macOS; WASAPI on Windows), and music: OPL FM
-# synthesis (opl/, Chocolate Doom's OPL module and Nuked OPL3).
-sound = ["dep:cpal"]
+# Sound effects and music through intuiTUIve's audio output (cpal: ALSA on
+# Linux, which needs libasound2-dev to build; CoreAudio on macOS; WASAPI on
+# Windows); the music is OPL FM synthesis (opl/, Chocolate Doom's OPL
+# module and Nuked OPL3).
+sound = ["intuituive/audio"]
+# PulseAudio and PipeWire's PulseAudio server directly, through cpal's own
+# client (no system library), where ALSA's default is not routed to one.
+pulse = ["sound", "intuituive/pulse"]
 
 # The rs-rich crates, from crates.io: the 0.0.21 cohort.
 [dependencies]
@@ -41,7 +45,6 @@ rich-art = { package = "rs-rich-art", version = "0.0.14", features = ["kitty", "
 rich-interact = { package = "rs-rich-interact", version = "0.0.9" }
 intuituive = { package = "rs-rich-intuituive", version = "0.0.6" }
 clap = { version = "4", features = ["derive"] }
-cpal = { version = "0.18", optional = true }
 ureq = "3"
 zip = { version = "8", default-features = false, features = ["deflate"] }
 sha2 = "0.10"

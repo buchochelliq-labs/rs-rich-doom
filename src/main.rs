@@ -9,10 +9,9 @@ use clap::Parser;
 use rs_rich_doom::app::{self, Draw};
 use rs_rich_doom::cli::{Cli, Command, Mode};
 use rs_rich_doom::data;
-use rs_rich_doom::engine::{self, Clock};
 use rs_rich_doom::graphics::{Pictures, Protocol};
-use rs_rich_doom::keys::HoldTimes;
 use rs_rich_doom::render::{CellMode, Fit};
+use rs_rich_doom::sound;
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
@@ -94,6 +93,10 @@ fn play(cli: Cli) -> Result<ExitCode, String> {
     let iwad = iwad
         .canonicalize()
         .map_err(|e| format!("{}: {e}", iwad.display()))?;
+    // Files named in Doom's arguments are the caller's, relative to where
+    // the game was started: made absolute before the directory changes.
+    let here = std::env::current_dir().map_err(|e| format!("the current directory: {e}"))?;
+    let args = data::resolve_doom_args(&cli.doom_args, &here);
     // Doom keeps default.cfg and its saves in the working directory: make
     // that the data directory, not wherever the game was started.
     if let Some(dir) = &dir {
@@ -109,39 +112,41 @@ fn play(cli: Cli) -> Result<ExitCode, String> {
         Draw::Image(protocol) => Some(Arc::new(Pictures::new(protocol, cell, cli.sixel_width))),
         Draw::Cells(_) => None,
     };
+    sound::choose_device(sound::Device {
+        name: cli.audio_device.clone(),
+        ..sound::Device::default()
+    });
+    sound::set_volume(cli.volume as f32 / 100.0);
     let options = app::Options {
-        engine: engine::Config {
-            iwad,
-            args: cli.doom_args.clone(),
-            clock: Clock::Real,
-            hold: HoldTimes {
-                first: cli.hold_ms,
-                ..HoldTimes::default()
-            },
-            sound: !cli.no_sound,
-            music: !cli.no_music,
-            music_gain: cli.music_volume as f32 / 100.0,
-            headless_audio: false,
-        },
+        iwad,
+        args,
+        sound: !cli.no_sound,
+        music: !cli.no_music,
+        music_gain: cli.music_volume as f32 / 100.0,
         draw,
         fit,
-        pictures: pictures.map(|p| p as Arc<Pictures>),
+        pictures,
         show_fps: cli.fps,
         quit_after: cli.quit_after.map(Duration::from_secs_f64),
+        hold: Duration::from_millis(cli.hold_ms),
     };
     let outcome = app::run(options).map_err(|e| e.to_string())?;
     if cli.stats {
         let s = &outcome.stats;
         eprintln!(
-            "mode {:?}: {} frames drawn ({} from the engine), {:.1} fps, {:.2} ms a draw",
+            "mode {:?}: {} frames drawn in {:.1} s ({:.1} fps; {} tics, newest engine frame {}), \
+             {} held back, last frame {} bytes",
             draw,
-            s.drawn,
-            s.engine_frames,
+            s.frames,
+            s.elapsed.as_secs_f64(),
             s.fps(),
-            s.mean_draw().as_secs_f64() * 1000.0
+            s.tics,
+            s.engine_frames,
+            s.skipped,
+            s.bytes
         );
     }
-    if let Some(note) = rs_rich_doom::sound::note() {
+    if let Some(note) = sound::note() {
         eprintln!("rs-rich-doom: {note}");
     }
     match outcome.exit {

@@ -4,7 +4,7 @@
  * MUS to MIDI with mus2mid, the GENMIDI lump's instrument patches, DMX's
  * voice allocation) driving the Nuked OPL3 emulator (opl/opl3.c) through
  * the software OPL driver here, which takes the place of Chocolate Doom's
- * SDL driver (opl/opl_sdl.c, which this follows). Rust's cpal mixer
+ * SDL driver (opl/opl_sdl.c, which this follows). The Rust mixer
  * (src/sound.rs) pulls the samples with rs_doom_music_render().
  *
  * Threads: the engine thread calls the module (play, stop, volume, pause)

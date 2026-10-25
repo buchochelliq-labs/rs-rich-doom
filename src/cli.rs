@@ -63,10 +63,19 @@ pub struct Cli {
     pub music_volume: u32,
 
     /// How long a key whose release the terminal does not report is held
-    /// after its first press, in milliseconds (longer than the keyboard's
-    /// auto-repeat delay).
+    /// after its last press or repeat, in milliseconds (longer than the
+    /// keyboard's auto-repeat delay).
     #[arg(long, value_name = "MS", default_value_t = 400)]
     pub hold_ms: u64,
+
+    /// Loudness of everything, in percent (Ctrl+S mutes in the game).
+    #[arg(long, value_name = "PERCENT", default_value_t = 100,
+          value_parser = clap::value_parser!(u32).range(0..=200))]
+    pub volume: u32,
+
+    /// The audio output: a device's id or name (default: the system's).
+    #[arg(long, value_name = "NAME")]
+    pub audio_device: Option<String>,
 
     /// Quit after this many seconds (for benchmarks).
     #[arg(long, value_name = "SECONDS")]
@@ -113,6 +122,8 @@ mod tests {
         assert!(!cli.no_music);
         assert_eq!(cli.music_volume, 100);
         assert_eq!(cli.hold_ms, 400);
+        assert_eq!(cli.volume, 100);
+        assert!(cli.audio_device.is_none());
         assert!(cli.command.is_none());
     }
 
@@ -147,6 +158,9 @@ mod tests {
         assert!(cli.no_music && !cli.no_sound);
         assert_eq!(cli.music_volume, 40);
         assert!(Cli::try_parse_from(["rs-rich-doom", "--music-volume", "500"]).is_err());
+        let cli = parse(&["--volume", "0", "--audio-device", "null"]);
+        assert_eq!((cli.volume, cli.audio_device.as_deref()), (0, Some("null")));
+        assert!(Cli::try_parse_from(["rs-rich-doom", "--volume", "201"]).is_err());
     }
 
     #[test]

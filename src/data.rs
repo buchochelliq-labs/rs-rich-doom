@@ -69,6 +69,53 @@ pub fn find_iwad(explicit: Option<&Path>, dir: Option<&Path>) -> Result<PathBuf,
     )
 }
 
+/// Doom's arguments that take files after them, up to the next `-` one.
+const FILE_ARGS: [&str; 5] = ["-file", "-merge", "-deh", "-iwad", "-config"];
+/// Those that take one file, named with or without `.lmp`.
+const DEMO_ARGS: [&str; 2] = ["-playdemo", "-timedemo"];
+
+/// Doom's arguments with the files they name made absolute from `here`,
+/// so they still mean the caller's files once the game runs in the data
+/// directory: each argument after `-file`, `-merge`, `-deh`, `-iwad` or
+/// `-config` (up to the next `-` argument) that is a file under `here`, a
+/// demo after `-playdemo` or `-timedemo` that is one (as named, or with
+/// `.lmp`), and the demo `-record` writes. Anything else, a demo lump's
+/// name (`demo1`) among them, is left as it is.
+pub fn resolve_doom_args(args: &[String], here: &Path) -> Vec<String> {
+    let absolute = |arg: &str| here.join(arg).to_string_lossy().into_owned();
+    let mut out = Vec::with_capacity(args.len());
+    let mut taking: Option<&str> = None;
+    for arg in args {
+        if arg.starts_with('-') {
+            taking = [FILE_ARGS.as_slice(), &DEMO_ARGS, &["-record"]]
+                .concat()
+                .into_iter()
+                .find(|a| a.eq_ignore_ascii_case(arg));
+            out.push(arg.clone());
+            continue;
+        }
+        let relative = Path::new(arg).is_relative();
+        let resolved = match taking {
+            Some(_) if !relative => arg.clone(),
+            Some(flag) if FILE_ARGS.contains(&flag) && here.join(arg).is_file() => absolute(arg),
+            Some(flag)
+                if DEMO_ARGS.contains(&flag)
+                    && (here.join(arg).is_file() || here.join(format!("{arg}.lmp")).is_file()) =>
+            {
+                absolute(arg)
+            }
+            Some("-record") => absolute(arg),
+            _ => arg.clone(),
+        };
+        if taking.is_some_and(|flag| flag != "-file" && flag != "-merge" && flag != "-deh") {
+            // One value only.
+            taking = None;
+        }
+        out.push(resolved);
+    }
+    out
+}
+
 /// Hex SHA-256 of `bytes`.
 pub fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
@@ -240,6 +287,48 @@ mod tests {
         assert!(!dir.join("README.html").exists());
         assert!(unpack_freedoom(b"nope", &dir).is_err());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn doom_arguments_keep_naming_the_callers_files() {
+        let here = scratch("args");
+        std::fs::write(here.join("mod.wad"), b"PWAD").unwrap();
+        std::fs::write(here.join("run.lmp"), b"demo").unwrap();
+        std::fs::write(here.join("fix.deh"), b"deh").unwrap();
+        let args: Vec<String> = [
+            "-file",
+            "mod.wad",
+            "missing.wad",
+            "-warp",
+            "1",
+            "1",
+            "-deh",
+            "fix.deh",
+            "-playdemo",
+            "run",
+            "-record",
+            "new",
+            "-skill",
+            "4",
+        ]
+        .map(String::from)
+        .to_vec();
+        let out = resolve_doom_args(&args, &here);
+        let at = |name: &str| here.join(name).to_string_lossy().into_owned();
+        assert_eq!(out[1], at("mod.wad"));
+        assert_eq!(out[2], "missing.wad", "not a file here: as it was");
+        assert_eq!(&out[3..6], &["-warp", "1", "1"]);
+        assert_eq!(out[7], at("fix.deh"));
+        assert_eq!(out[9], at("run"), "a demo file, without .lmp");
+        assert_eq!(out[11], at("new"), "-record writes there");
+        assert_eq!(&out[12..], &["-skill", "4"]);
+        // A demo lump of the IWAD keeps its name; absolute paths stay.
+        let lump = resolve_doom_args(&["-playdemo".into(), "demo1".into()], &here);
+        assert_eq!(lump, ["-playdemo", "demo1"]);
+        let abs = here.join("mod.wad").to_string_lossy().into_owned();
+        let kept = resolve_doom_args(&["-file".into(), abs.clone()], Path::new("/elsewhere"));
+        assert_eq!(kept[1], abs);
+        std::fs::remove_dir_all(&here).unwrap();
     }
 
     #[test]
