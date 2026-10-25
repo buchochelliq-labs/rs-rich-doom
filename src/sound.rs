@@ -72,11 +72,6 @@ pub fn configure(audio: Audio) {
 pub struct Device {
     pub name: Option<String>,
     pub rate: Option<u32>,
-    /// Never mix more than a little ahead of the wall clock: for a device
-    /// that takes samples as fast as they come (ALSA's `null`, a file), so
-    /// the mixer does not run flat out. Real sound cards keep time
-    /// themselves.
-    pub wall_clock: bool,
 }
 
 #[cfg(feature = "sound")]
@@ -357,7 +352,7 @@ mod device {
     use std::ffi::{c_int, c_uint};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex, OnceLock};
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     use intuituive::audio::{output, Output, OutputOptions};
 
@@ -433,13 +428,11 @@ mod device {
         let mixer = Arc::new(Mutex::new(Mixer::new(rate)));
         let frames = Arc::new(AtomicU64::new(0));
         let (writer, shared, written) = (output.clone(), mixer.clone(), frames.clone());
-        let wall_clock = choice.wall_clock;
         std::thread::Builder::new()
             .name("rs-rich-doom-mixer".into())
             .spawn(move || {
                 let mut block = vec![0.0f32; BLOCK_FRAMES * channels];
                 let mut tune = vec![0i16; BLOCK_FRAMES * 2];
-                let started = Instant::now();
                 loop {
                     match shared.lock() {
                         Ok(mut mixer) => mixer.mix_unclipped(&mut block, channels),
@@ -457,15 +450,7 @@ mod device {
                     if !writer.write(&block) {
                         break;
                     }
-                    let done = written.fetch_add(BLOCK_FRAMES as u64, Ordering::SeqCst)
-                        + BLOCK_FRAMES as u64;
-                    if wall_clock {
-                        let due = Duration::from_secs_f64(done as f64 / f64::from(rate));
-                        let ahead = due.saturating_sub(started.elapsed());
-                        if ahead > QUEUE {
-                            std::thread::sleep(ahead - QUEUE);
-                        }
-                    }
+                    written.fetch_add(BLOCK_FRAMES as u64, Ordering::SeqCst);
                 }
             })
             .map_err(|e| format!("no audio output ({e})"))?;

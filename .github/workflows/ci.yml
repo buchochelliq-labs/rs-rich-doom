@@ -6,6 +6,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # The engine and app tests fail rather than skip without an IWAD.
+  RS_RICH_DOOM_REQUIRE_IWAD: "1"
 
 jobs:
   check:
@@ -37,4 +39,4 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
       - name: Without sound
-        run: cargo test --no-default-features --lib
+        run: cargo test --no-default-features
