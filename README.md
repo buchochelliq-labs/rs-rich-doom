@@ -1,5 +1,8 @@
 # rs-rich-doom
 
+Doom in the terminal, drawn and driven by [rs-rich](https://github.com/buchochelliq-labs/rs-rich-cli)
+and its TUI framework [intuiTUIve](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/).
+
 ![Freedoom's first demo in half blocks, recorded with rs-rich-record](docs/media/doom-half/doom-half.gif)
 
 **[Watch it with sound](docs/media/doom-play.mp4)** (30 s, MP4: the first demo
@@ -24,14 +27,34 @@ Real Doom in the terminal. The engine is id Software's GPL release of Doom,
 through [doomgeneric](https://github.com/ozkl/doomgeneric) (Chocolate Doom's
 code with a six-function platform layer); the picture, the keyboard and the
 app loop are the [rs-rich](https://github.com/buchochelliq-labs/rs-rich-cli)
-crates, from crates.io (the 0.0.21 cohort): rs-rich-art (Kitty, Sixel and
-iTerm2 encoders), rs-rich-ext (capability detection, the graphics side
-channel), rs-rich-interact (the terminal session, raw input, the kitty
-keyboard protocol, synchronized output) and intuiTUIve (the app; pixel
+crates, from crates.io (the 0.0.21 cohort): [rs-rich-art](https://crates.io/crates/rs-rich-art) (Kitty, Sixel and
+iTerm2 encoders), [rs-rich-ext](https://crates.io/crates/rs-rich-ext) (capability detection, the graphics side
+channel), [rs-rich-interact](https://crates.io/crates/rs-rich-interact) (the terminal session, raw input, the kitty
+keyboard protocol, synchronized output) and [intuiTUIve](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/) (the app; pixel
 cells; held keys; `fixed_step`, which is the game's clock; the frame-rate
 meter and stats; the audio output). Doom draws its own HUD; the app adds
 nothing over it but an optional fps counter. What rs-rich still lacks for
 this, and could take into core, is in
+[docs/core-gaps.md](docs/core-gaps.md).
+
+## Built with rs-rich and intuiTUIve
+
+rs-rich-doom is a demo of what the rs-rich crates can drive: a 35 Hz game
+with its own picture, held keys and sound, in an ordinary terminal.
+
+- **[rs-rich](https://github.com/buchochelliq-labs/rs-rich-cli)**: a Rust
+  port of Python's [rich](https://github.com/Textualize/rich), with the
+  `rich` command line, terminal graphics, recordings and interactive
+  components. [Documentation](https://buchochelliq-labs.github.io/rs-rich-cli/latest/) ·
+  [crates.io](https://crates.io/crates/rs-rich).
+- **[intuiTUIve](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/)**: rs-rich's TUI framework
+  (signals, a retained tree, a cell screen, held keys, a fixed-step clock,
+  audio output), which runs this game.
+  [Tutorial: a to-do app](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/tutorial/) ·
+  [crates.io](https://crates.io/crates/rs-rich-intuituive) ·
+  [source](https://github.com/buchochelliq-labs/rs-rich-cli/tree/main/crates/rich-intuituive).
+
+What Doom needed and rs-rich did not yet have became rs-rich work: see
 [docs/core-gaps.md](docs/core-gaps.md).
 
 DOOM is a registered trademark of id Software LLC, a ZeniMax Media company.
