@@ -193,6 +193,9 @@ struct Host {
     /// sleeping, so the stepped clock never moves, and the engine measures
     /// the run's frame rate with `I_GetTime`.
     wall: Option<Instant>,
+    /// The stepped clock's tics given by the app; `time` follows a tic at
+    /// a time.
+    given: u64,
     seq: u64,
     /// The last frame sent.
     last: Vec<u32>,
@@ -267,6 +270,7 @@ pub fn run(
             input,
             clock: config.clock,
             time: 0,
+            given: 0,
             wall: timed_demo.then(Instant::now),
             seq: 0,
             last: Vec::new(),
@@ -362,13 +366,15 @@ extern "C" fn rs_doom_sleep_ms(ms: u32) {
             Sleep::Done
         }
         Clock::Stepped(pacer) => {
-            // Tics given already: take them without waiting.
-            let mut given = host.time;
+            // The clock moves one tic a sleep, never further: with the
+            // classic sync, the engine builds at most five tic commands
+            // ahead and drops the rest of a jump, so catching up after a
+            // slow frame would lose tics.
             while let Ok(at) = pacer.steps.try_recv() {
-                given = given.max(at);
+                host.given = host.given.max(at);
             }
-            if given > host.time {
-                host.time = given;
+            if host.given > host.time {
+                host.time += 1;
                 return Sleep::Done;
             }
             // The engine has run every tic it was given: say so, and wait
@@ -376,7 +382,10 @@ extern "C" fn rs_doom_sleep_ms(ms: u32) {
             let _ = pacer.idle.send(host.time);
             match pacer.steps.recv() {
                 Ok(at) => {
-                    host.time = host.time.max(at);
+                    host.given = host.given.max(at);
+                    if host.given > host.time {
+                        host.time += 1;
+                    }
                     Sleep::Done
                 }
                 Err(_) => Sleep::Orphaned,
@@ -476,6 +485,40 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_catch_up_moves_the_clock_a_tic_at_a_time() {
+        // The classic sync builds at most five tic commands ahead and drops
+        // the rest of a jump: nine tics given at once must reach the engine
+        // as nine sleeps of one tic each, none of them waiting.
+        let (pace, pacer) = pace();
+        let (_keys, input) = mpsc::channel();
+        HOST.with(|host| {
+            *host.borrow_mut() = Some(Host {
+                on_frame: Box::new(|_| {}),
+                on_exit: Box::new(|_| {}),
+                input,
+                clock: Clock::Stepped(pacer),
+                time: 0,
+                given: 0,
+                wall: None,
+                seq: 0,
+                last: Vec::new(),
+                log: Log::default(),
+                title: String::new(),
+            })
+        });
+        pace.steps.send(9).unwrap();
+        for tic in 1..=9 {
+            rs_doom_sleep_ms(1);
+            assert_eq!(with_host(|host| host.time), Some(tic));
+        }
+        assert!(
+            pace.idle.try_recv().is_err(),
+            "not idle while tics are left"
+        );
+        HOST.with(|host| host.borrow_mut().take());
+    }
+
+    #[test]
     fn a_timed_demo_reads_the_wall_clock() {
         // -timedemo never sleeps, so the stepped clock would stand still and
         // the engine's measured frame rate would divide by no time at all.
@@ -487,6 +530,7 @@ mod tests {
             input,
             clock: Clock::Stepped(pacer),
             time: 0,
+            given: 0,
             wall: Some(Instant::now()),
             seq: 0,
             last: Vec::new(),
@@ -511,6 +555,7 @@ mod tests {
             input,
             clock: Clock::Stepped(pacer),
             time: 0,
+            given: 0,
             wall: None,
             seq: 0,
             last: Vec::new(),
