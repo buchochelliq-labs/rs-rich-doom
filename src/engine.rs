@@ -189,6 +189,10 @@ struct Host {
     clock: Clock,
     /// The virtual clock's milliseconds, or the stepped clock's tics.
     time: u64,
+    /// A timed demo's wall clock: `-timedemo` runs a tic per frame without
+    /// sleeping, so the stepped clock never moves, and the engine measures
+    /// the run's frame rate with `I_GetTime`.
+    wall: Option<Instant>,
     seq: u64,
     /// The last frame sent.
     last: Vec<u32>,
@@ -198,6 +202,9 @@ struct Host {
 
 impl Host {
     fn now_ms(&self) -> u64 {
+        if let Some(start) = self.wall {
+            return 1 + start.elapsed().as_millis() as u64;
+        }
         match self.clock {
             Clock::Virtual => self.time,
             // Rounded up, so I_GetTime's `ms * 35 / 1000` is the tic itself;
@@ -248,6 +255,11 @@ pub fn run(
         headless: config.headless_audio,
     });
     *ENGINE_LOG.lock().unwrap_or_else(|e| e.into_inner()) = Some(log.clone());
+    let timed_demo = matches!(config.clock, Clock::Stepped(_))
+        && config
+            .args
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case("-timedemo"));
     HOST.with(|host| {
         *host.borrow_mut() = Some(Host {
             on_frame: Box::new(on_frame),
@@ -255,6 +267,7 @@ pub fn run(
             input,
             clock: config.clock,
             time: 0,
+            wall: timed_demo.then(Instant::now),
             seq: 0,
             last: Vec::new(),
             log,
@@ -463,6 +476,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_timed_demo_reads_the_wall_clock() {
+        // -timedemo never sleeps, so the stepped clock would stand still and
+        // the engine's measured frame rate would divide by no time at all.
+        let (_pace, pacer) = pace();
+        let (_keys, input) = mpsc::channel();
+        let host = Host {
+            on_frame: Box::new(|_| {}),
+            on_exit: Box::new(|_| {}),
+            input,
+            clock: Clock::Stepped(pacer),
+            time: 0,
+            wall: Some(Instant::now()),
+            seq: 0,
+            last: Vec::new(),
+            log: Log::default(),
+            title: String::new(),
+        };
+        let before = host.now_ms();
+        assert!(before >= 1, "0 reads as no base time yet");
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(host.now_ms() >= before + 60);
+    }
+
+    #[test]
     fn a_stepped_clock_reads_whole_tics() {
         // I_GetTime is (ms - base) * 35 / 1000: each tic must read as
         // itself.
@@ -474,6 +511,7 @@ mod tests {
             input,
             clock: Clock::Stepped(pacer),
             time: 0,
+            wall: None,
             seq: 0,
             last: Vec::new(),
             log: Log::default(),
