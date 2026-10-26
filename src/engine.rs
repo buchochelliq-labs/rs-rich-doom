@@ -4,18 +4,24 @@
 //!
 //! The engine is one global C program, so it runs once per process, on the
 //! thread that calls [`run`]. That thread keeps a [`Host`]: where frames go,
-//! the keys Doom holds, the clock, and what to do when the game exits.
+//! the key events for Doom, the clock, and what to do when the game exits.
+//!
+//! The clock is not the engine's own. In the app it is the app's: a
+//! [`Pace`] moves it on a tic at a time from intuiTUIve's `fixed_step`,
+//! and waits while the engine runs those tics, so the game keeps to the
+//! app's clock (a headless driver's too) and draws once a tic. Tests run
+//! it on a [`Clock::Virtual`] that moves when the engine sleeps.
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::ffi::{c_char, c_int, CStr, CString};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::keys::{HoldTimes, Input, KeyState};
+use crate::keys::Input;
 use crate::render::Frame;
 
 extern "C" {
@@ -25,6 +31,12 @@ extern "C" {
     fn rs_doom_resy() -> c_int;
 }
 
+/// Doom's tics a second.
+pub const TICRATE: u64 = 35;
+
+/// The time between two tics.
+pub const TIC: Duration = Duration::from_nanos(1_000_000_000 / TICRATE);
+
 /// The engine's framebuffer size, as compiled.
 pub fn resolution() -> (usize, usize) {
     // SAFETY: plain functions returning compile-time constants.
@@ -32,13 +44,77 @@ pub fn resolution() -> (usize, usize) {
 }
 
 /// How the engine tells time.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum Clock {
-    /// The wall clock: the game runs at 35 tics a second.
-    Real,
     /// A clock that only moves when the engine sleeps: tics run as fast as
     /// the machine allows, the same on every run. For tests.
     Virtual,
+    /// Tics given by the app through the [`Pace`] that came with this
+    /// [`Pacer`] ([`pace`]).
+    Stepped(Pacer),
+}
+
+/// The app's side of a [`Clock::Stepped`]: moves the engine's clock on.
+#[derive(Debug)]
+pub struct Pace {
+    steps: Sender<u64>,
+    idle: Receiver<u64>,
+    /// The tics given so far.
+    given: u64,
+}
+
+/// The engine's side of a [`Clock::Stepped`].
+#[derive(Debug)]
+pub struct Pacer {
+    steps: Receiver<u64>,
+    idle: Sender<u64>,
+}
+
+/// A stepped clock: the [`Pace`] for the app, the [`Pacer`] for the
+/// engine's [`Config::clock`].
+pub fn pace() -> (Pace, Pacer) {
+    let (steps_tx, steps_rx) = mpsc::channel();
+    let (idle_tx, idle_rx) = mpsc::channel();
+    (
+        Pace {
+            steps: steps_tx,
+            idle: idle_rx,
+            given: 0,
+        },
+        Pacer {
+            steps: steps_rx,
+            idle: idle_tx,
+        },
+    )
+}
+
+impl Pace {
+    /// Move the engine's clock on by `tics`, and wait at most `wait` for
+    /// the engine to run them and to wait for more (so their frame is
+    /// drawn). False once the engine has gone (it exited, or never
+    /// started).
+    pub fn step(&mut self, tics: u64, wait: Duration) -> bool {
+        self.given += tics;
+        if self.steps.send(self.given).is_err() {
+            return false;
+        }
+        let deadline = Instant::now() + wait;
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match self.idle.recv_timeout(left) {
+                Ok(at) if at >= self.given => return true,
+                Ok(_) => {}
+                // Slow (a level loading): it catches up on later steps.
+                Err(RecvTimeoutError::Timeout) => return true,
+                Err(RecvTimeoutError::Disconnected) => return false,
+            }
+        }
+    }
+
+    /// The tics given so far.
+    pub fn given(&self) -> u64 {
+        self.given
+    }
 }
 
 /// Why the engine stopped.
@@ -51,13 +127,12 @@ pub struct Exit {
 }
 
 /// What the engine needs to start.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Config {
     pub iwad: PathBuf,
     /// More engine arguments (`-warp 1 1`, `-skill 3`, `-file x.wad`).
     pub args: Vec<String>,
     pub clock: Clock,
-    pub hold: HoldTimes,
     /// Play sound effects (when built with the `sound` feature).
     pub sound: bool,
     /// Play music (OPL FM synthesis, with the `sound` feature).
@@ -111,10 +186,16 @@ struct Host {
     on_frame: Box<dyn FnMut(Frame)>,
     on_exit: Box<dyn FnMut(Exit)>,
     input: Receiver<Input>,
-    keys: KeyState,
     clock: Clock,
-    started: Instant,
-    virtual_ms: u64,
+    /// The virtual clock's milliseconds, or the stepped clock's tics.
+    time: u64,
+    /// A timed demo's wall clock: `-timedemo` runs a tic per frame without
+    /// sleeping, so the stepped clock never moves, and the engine measures
+    /// the run's frame rate with `I_GetTime`.
+    wall: Option<Instant>,
+    /// The stepped clock's tics given by the app; `time` follows a tic at
+    /// a time.
+    given: u64,
     seq: u64,
     /// The last frame sent.
     last: Vec<u32>,
@@ -124,9 +205,14 @@ struct Host {
 
 impl Host {
     fn now_ms(&self) -> u64 {
+        if let Some(start) = self.wall {
+            return 1 + start.elapsed().as_millis() as u64;
+        }
         match self.clock {
-            Clock::Real => self.started.elapsed().as_millis() as u64,
-            Clock::Virtual => self.virtual_ms,
+            Clock::Virtual => self.time,
+            // Rounded up, so I_GetTime's `ms * 35 / 1000` is the tic itself;
+            // from 1, as the engine reads 0 as "no base time yet".
+            Clock::Stepped(_) => 1 + (self.time * 1000).div_ceil(TICRATE),
         }
     }
 }
@@ -145,11 +231,11 @@ fn with_host<T>(f: impl FnOnce(&mut Host) -> T) -> Option<T> {
     HOST.with(|host| host.borrow_mut().as_mut().map(f))
 }
 
-/// Run the engine on this thread: each frame goes to `on_frame`, keys come
-/// from `input`, and when the game exits `on_exit` is told and this thread
-/// parks for good (the process ends from elsewhere). Returns only if
-/// `ticks` is `Some(n)`, after `n` engine ticks, or with an error before
-/// the engine starts. Once per process.
+/// Run the engine on this thread: each frame goes to `on_frame`, key
+/// events come from `input`, and when the game exits `on_exit` is told
+/// and this thread parks for good (the process ends from elsewhere).
+/// Returns only if `ticks` is `Some(n)`, after `n` engine ticks, or with
+/// an error before the engine starts. Once per process.
 pub fn run(
     config: Config,
     input: Receiver<Input>,
@@ -172,15 +258,20 @@ pub fn run(
         headless: config.headless_audio,
     });
     *ENGINE_LOG.lock().unwrap_or_else(|e| e.into_inner()) = Some(log.clone());
+    let timed_demo = matches!(config.clock, Clock::Stepped(_))
+        && config
+            .args
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case("-timedemo"));
     HOST.with(|host| {
         *host.borrow_mut() = Some(Host {
             on_frame: Box::new(on_frame),
             on_exit: Box::new(on_exit),
             input,
-            keys: KeyState::new(config.hold),
             clock: config.clock,
-            started: Instant::now(),
-            virtual_ms: 0,
+            time: 0,
+            given: 0,
+            wall: timed_demo.then(Instant::now),
             seq: 0,
             last: Vec::new(),
             log,
@@ -259,17 +350,54 @@ extern "C" fn rs_doom_draw_frame(pixels: *const u32, width: c_int, height: c_int
     with_host(|host| host.on_frame = sink);
 }
 
+/// What a sleep comes to (with no host yet, the wall clock's).
+enum Sleep {
+    /// Done: the virtual clock moved, or the app gave more tics.
+    Done,
+    /// The app has gone: wait for the process to end.
+    Orphaned,
+}
+
 #[no_mangle]
 extern "C" fn rs_doom_sleep_ms(ms: u32) {
-    let real = with_host(|host| match host.clock {
-        Clock::Real => true,
+    let sleep = with_host(|host| match &host.clock {
         Clock::Virtual => {
-            host.virtual_ms += u64::from(ms.max(1));
-            false
+            host.time += u64::from(ms.max(1));
+            Sleep::Done
+        }
+        Clock::Stepped(pacer) => {
+            // The clock moves one tic a sleep, never further: with the
+            // classic sync, the engine builds at most five tic commands
+            // ahead and drops the rest of a jump, so catching up after a
+            // slow frame would lose tics.
+            while let Ok(at) = pacer.steps.try_recv() {
+                host.given = host.given.max(at);
+            }
+            if host.given > host.time {
+                host.time += 1;
+                return Sleep::Done;
+            }
+            // The engine has run every tic it was given: say so, and wait
+            // for the next.
+            let _ = pacer.idle.send(host.time);
+            match pacer.steps.recv() {
+                Ok(at) => {
+                    host.given = host.given.max(at);
+                    if host.given > host.time {
+                        host.time += 1;
+                    }
+                    Sleep::Done
+                }
+                Err(_) => Sleep::Orphaned,
+            }
         }
     });
-    if real != Some(false) {
-        std::thread::sleep(Duration::from_millis(u64::from(ms)));
+    match sleep {
+        None => std::thread::sleep(Duration::from_millis(u64::from(ms))),
+        Some(Sleep::Done) => {}
+        Some(Sleep::Orphaned) => loop {
+            std::thread::park();
+        },
     }
 }
 
@@ -280,25 +408,21 @@ extern "C" fn rs_doom_ticks_ms() -> u32 {
 
 #[no_mangle]
 extern "C" fn rs_doom_get_key(pressed: *mut c_int, key: *mut u8) -> c_int {
-    let event = with_host(|host| {
-        let now = host.now_ms();
-        while let Ok(input) = host.input.try_recv() {
-            host.keys.input(input, now);
-        }
-        host.keys.next_event(now)
-    })
-    .flatten();
-    match event {
-        Some((down, k)) if !pressed.is_null() && !key.is_null() => {
-            // SAFETY: the engine passes two valid out-pointers.
-            unsafe {
-                *pressed = c_int::from(down);
-                *key = k;
-            }
-            1
-        }
-        _ => 0,
+    let event = with_host(|host| host.input.try_recv().ok()).flatten();
+    let (down, k) = match event {
+        Some(Input::Down(k)) => (true, k),
+        Some(Input::Up(k)) => (false, k),
+        None => return 0,
+    };
+    if pressed.is_null() || key.is_null() {
+        return 0;
     }
+    // SAFETY: the engine passes two valid out-pointers.
+    unsafe {
+        *pressed = c_int::from(down);
+        *key = k;
+    }
+    1
 }
 
 #[no_mangle]
@@ -345,9 +469,121 @@ extern "C" fn rs_doom_exit(code: c_int) -> ! {
             tell(exit);
         }
     }
+    // The host goes, and with it the stepped clock: an app waiting on a
+    // step learns at once that the engine has gone.
+    let host = HOST.with(|host| host.borrow_mut().take());
+    drop(host);
     // The engine cannot go on after exit(); the process ends from the
     // terminal side, which restores the terminal first.
     loop {
         std::thread::park();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_catch_up_moves_the_clock_a_tic_at_a_time() {
+        // The classic sync builds at most five tic commands ahead and drops
+        // the rest of a jump: nine tics given at once must reach the engine
+        // as nine sleeps of one tic each, none of them waiting.
+        let (pace, pacer) = pace();
+        let (_keys, input) = mpsc::channel();
+        HOST.with(|host| {
+            *host.borrow_mut() = Some(Host {
+                on_frame: Box::new(|_| {}),
+                on_exit: Box::new(|_| {}),
+                input,
+                clock: Clock::Stepped(pacer),
+                time: 0,
+                given: 0,
+                wall: None,
+                seq: 0,
+                last: Vec::new(),
+                log: Log::default(),
+                title: String::new(),
+            })
+        });
+        pace.steps.send(9).unwrap();
+        for tic in 1..=9 {
+            rs_doom_sleep_ms(1);
+            assert_eq!(with_host(|host| host.time), Some(tic));
+        }
+        assert!(
+            pace.idle.try_recv().is_err(),
+            "not idle while tics are left"
+        );
+        HOST.with(|host| host.borrow_mut().take());
+    }
+
+    #[test]
+    fn a_timed_demo_reads_the_wall_clock() {
+        // -timedemo never sleeps, so the stepped clock would stand still and
+        // the engine's measured frame rate would divide by no time at all.
+        let (_pace, pacer) = pace();
+        let (_keys, input) = mpsc::channel();
+        let host = Host {
+            on_frame: Box::new(|_| {}),
+            on_exit: Box::new(|_| {}),
+            input,
+            clock: Clock::Stepped(pacer),
+            time: 0,
+            given: 0,
+            wall: Some(Instant::now()),
+            seq: 0,
+            last: Vec::new(),
+            log: Log::default(),
+            title: String::new(),
+        };
+        let before = host.now_ms();
+        assert!(before >= 1, "0 reads as no base time yet");
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(host.now_ms() >= before + 60);
+    }
+
+    #[test]
+    fn a_stepped_clock_reads_whole_tics() {
+        // I_GetTime is (ms - base) * 35 / 1000: each tic must read as
+        // itself.
+        let (_pace, pacer) = pace();
+        let (_keys, input) = mpsc::channel();
+        let mut host = Host {
+            on_frame: Box::new(|_| {}),
+            on_exit: Box::new(|_| {}),
+            input,
+            clock: Clock::Stepped(pacer),
+            time: 0,
+            given: 0,
+            wall: None,
+            seq: 0,
+            last: Vec::new(),
+            log: Log::default(),
+            title: String::new(),
+        };
+        let base = host.now_ms();
+        for tic in 0..10_000u64 {
+            host.time = tic;
+            assert_eq!((host.now_ms() - base) * TICRATE / 1000, tic);
+        }
+        assert_eq!(TIC.as_micros(), 28_571);
+    }
+
+    #[test]
+    fn pace_waits_for_the_engine_and_learns_it_has_gone() {
+        let (mut pace, pacer) = pace();
+        let engine = std::thread::spawn(move || {
+            // Two tics' work, reporting idle after each, then exit.
+            for _ in 0..2 {
+                let at = pacer.steps.recv().unwrap();
+                pacer.idle.send(at).unwrap();
+            }
+        });
+        assert!(pace.step(1, Duration::from_secs(5)));
+        assert!(pace.step(2, Duration::from_secs(5)));
+        assert_eq!(pace.given(), 3);
+        engine.join().unwrap();
+        assert!(!pace.step(1, Duration::from_secs(5)), "gone");
     }
 }

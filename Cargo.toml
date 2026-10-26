@@ -1,8 +1,11 @@
 # rs-rich-doom: Doom (the GPL engine, through doomgeneric) in the terminal,
 # drawn and driven by the rs-rich crates.
 #
-# GPL-2.0-or-later, because the engine it links is. rs-rich itself is MIT and
-# is used here as an ordinary library dependency.
+# The source is GPL-2.0-or-later, because the engine it links is; `license`
+# describes this package, which is source. Built binaries are
+# GPL-3.0-or-later (LICENSE-GPL-3.0): they also link Apache-2.0-only crates
+# (cpal, ring). See docs/licensing.md. rs-rich itself is MIT and is used here
+# as an ordinary library dependency.
 [package]
 name = "rs-rich-doom"
 version = "0.0.1"
@@ -28,23 +31,28 @@ path = "src/main.rs"
 
 [features]
 default = ["sound"]
-# Sound effects through cpal (ALSA on Linux, which needs libasound2-dev to
-# build; CoreAudio on macOS; WASAPI on Windows), and music: OPL FM
-# synthesis (opl/, Chocolate Doom's OPL module and Nuked OPL3).
-sound = ["dep:cpal"]
+# Sound effects and music through intuiTUIve's audio output (cpal: ALSA on
+# Linux, which needs libasound2-dev to build; CoreAudio on macOS; WASAPI on
+# Windows); the music is OPL FM synthesis (opl/, Chocolate Doom's OPL
+# module and Nuked OPL3).
+sound = ["intuituive/audio"]
+# PulseAudio and PipeWire's PulseAudio server directly, through cpal's own
+# client (no system library), where ALSA's default is not routed to one.
+pulse = ["sound", "intuituive/pulse"]
 
-# The rs-rich crates, pinned to one commit of the branch this was written
-# against (claude/next-priority-items-3c5p8e).
+# The rs-rich crates, from crates.io: the 0.0.21 cohort.
 [dependencies]
-rich = { package = "rs-rich", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
-rich-ext = { package = "rs-rich-ext", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1", default-features = false }
-rich-art = { package = "rs-rich-art", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1", features = ["kitty", "sixel", "iterm"] }
-rich-interact = { package = "rs-rich-interact", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
-intuituive = { package = "rs-rich-intuituive", git = "https://github.com/buchochelliq-labs/rs-rich-cli", rev = "866b897a91e8ce05b1325685abffca15cbf612b1" }
+rich = { package = "rs-rich", version = "0.0.11" }
+rich-ext = { package = "rs-rich-ext", version = "0.0.18", default-features = false }
+rich-art = { package = "rs-rich-art", version = "0.0.14", features = ["kitty", "sixel", "iterm"] }
+rich-interact = { package = "rs-rich-interact", version = "0.0.9" }
+intuituive = { package = "rs-rich-intuituive", version = "0.0.6" }
 clap = { version = "4", features = ["derive"] }
-cpal = { version = "0.18", optional = true }
-ureq = "3"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+# The system's certificate store first (a corporate or sandbox proxy's CA
+# is there), Mozilla's bundled roots as the fallback.
+ureq = { version = "3.4", features = ["platform-verifier"] }
+# Reading only: flate2 on zlib-rs (Zlib licence), not zopfli (Apache-2.0).
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 sha2 = "0.10"
 libc = "0.2"
 

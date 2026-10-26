@@ -183,16 +183,20 @@ impl Pictures {
     }
 
     /// The cells an overlay of `rect` really covers: Sixel images are sent
-    /// at most `max_width` pixels wide, so they may take fewer cells.
+    /// at most `max_width` pixels wide, so they may take fewer cells, and
+    /// are centred in `rect`.
     pub fn covered(&self, rect: CellRect) -> CellRect {
         match self.protocol {
             Protocol::Kitty | Protocol::Iterm => rect,
             Protocol::Sixel => {
                 let (w, h) = pixel_size(rect, self.cell, self.max_width);
+                let cols = w.div_ceil(self.cell.0).min(rect.cols as u32) as u16;
+                let rows = h.div_ceil(self.cell.1).min(rect.rows as u32) as u16;
                 CellRect {
-                    cols: w.div_ceil(self.cell.0).min(rect.cols as u32) as u16,
-                    rows: h.div_ceil(self.cell.1).min(rect.rows as u32) as u16,
-                    ..rect
+                    x: rect.x + (rect.cols - cols) / 2,
+                    y: rect.y + (rect.rows - rows) / 2,
+                    cols,
+                    rows,
                 }
             }
         }
@@ -343,8 +347,17 @@ mod tests {
         assert_eq!(pixel_size(rect, (10, 20), 2000), (640, 480));
         assert_eq!(pixel_size(rect, (10, 20), 320), (320, 240));
         let p = Pictures::new(Protocol::Sixel, (10, 20), 320);
-        assert_eq!(p.covered(rect).cols, 32);
-        assert_eq!(p.covered(rect).rows, 12);
+        let covered = p.covered(rect);
+        assert_eq!((covered.cols, covered.rows), (32, 12));
+        // Centred where the full size would have been, not at its corner.
+        assert_eq!((covered.x, covered.y), (16, 6));
+        // The review's case: 160x50 with 8x16 cells, the last row kept.
+        let p = Pictures::new(Protocol::Sixel, (8, 16), 640);
+        let fitted = crate::render::Fit::default().place(160, 49);
+        let covered = p.covered(fitted);
+        assert_eq!((covered.cols, covered.rows), (80, 30));
+        assert_eq!((fitted.x, fitted.cols), (14, 131));
+        assert_eq!((covered.x, covered.y), (39, 9));
     }
 
     #[test]

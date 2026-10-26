@@ -1,9 +1,10 @@
 /*
  * rs-rich-doom: doomgeneric's sound module (DG_sound_module), mixing in
- * Rust through cpal (src/sound.rs). The engine says which effect to start
- * on which channel at what volume and stereo separation; this reads the
- * effect's DMX lump (8-bit unsigned PCM, usually 11025 Hz) and hands the
- * samples to Rust, which resamples and mixes them.
+ * Rust (src/sound.rs, played through intuiTUIve's audio output). The engine
+ * says which effect to start on which channel at what volume and stereo
+ * separation; this reads the effect's DMX lump (8-bit unsigned PCM,
+ * usually 11025 Hz) and hands the samples to Rust, which resamples and
+ * mixes them.
  *
  * Music is csrc/music.c: OPL FM synthesis, mixed in by the same Rust code.
  *

@@ -1,15 +1,18 @@
-//! Sound effects and music through cpal.
+//! Sound effects and music, played through intuiTUIve's audio output.
 //!
-//! Effects: the engine's sound module (csrc/sound.c) hands each effect to
-//! this mixer. They are 8-bit unsigned PCM at their own rate (usually
-//! 11025 Hz), resampled here to the device's rate and panned by Doom's
-//! stereo separation.
+//! What is Doom's own stays here: the effects are the engine's DMX lumps
+//! (csrc/sound.c hands each to this [`Mixer`]), 8-bit unsigned PCM at
+//! their own rate (usually 11025 Hz), resampled to the device's rate and
+//! panned by Doom's stereo separation; the music is Chocolate Doom's OPL
+//! module (csrc/music.c, opl/) playing MUS through an emulated OPL3 FM
+//! chip with the IWAD's GENMIDI instruments ([`render_music`]).
 //!
-//! Music: the engine's music module (csrc/music.c, Chocolate Doom's OPL
-//! module in opl/) plays MUS through an emulated OPL3 FM chip with the
-//! IWAD's GENMIDI instruments, as Doom did on a Sound Blaster. The audio
-//! callback here pulls its samples at the device's rate
-//! ([`render_music`]) and adds them to the effects.
+//! What is generic is intuiTUIve's (its `audio` feature, on cpal): the
+//! sound card ([`intuituive::audio::output`]: the device, its stream and
+//! queue, and keeping ALSA's messages off the screen while it opens), the
+//! master volume and mute ([`set_volume`], [`set_muted`]). A thread of this
+//! module mixes a block at a time, effects then music, and writes it to the
+//! output, whose queue keeps it a few tens of milliseconds ahead.
 
 #[cfg(feature = "sound")]
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -24,6 +27,11 @@ static MUSIC_GAIN: AtomicU32 = AtomicU32::new(0x3f80_0000);
 /// Music without a device, at this rate (0: through the device).
 #[cfg(feature = "sound")]
 static HEADLESS_RATE: AtomicU32 = AtomicU32::new(0);
+/// The master volume, as `f32` bits, and whether it is muted.
+#[cfg(feature = "sound")]
+static VOLUME: AtomicU32 = AtomicU32::new(0x3f80_0000);
+#[cfg(feature = "sound")]
+static MUTED: AtomicBool = AtomicBool::new(false);
 
 /// The rate music is made at when there is no device ([`Audio::headless`]).
 pub const HEADLESS_RATE_HZ: u32 = 44_100;
@@ -57,6 +65,63 @@ pub fn configure(audio: Audio) {
     let _ = audio;
 }
 
+/// Which output to open, before the engine starts: a device by id or name
+/// (`--audio-device`; else the default one) and a rate (else the
+/// device's).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Device {
+    pub name: Option<String>,
+    pub rate: Option<u32>,
+}
+
+#[cfg(feature = "sound")]
+static DEVICE: std::sync::Mutex<Option<Device>> = std::sync::Mutex::new(None);
+
+/// Open `device` when sound first plays (once per process).
+pub fn choose_device(device: Device) {
+    #[cfg(feature = "sound")]
+    {
+        *DEVICE.lock().unwrap_or_else(|e| e.into_inner()) = Some(device);
+    }
+    #[cfg(not(feature = "sound"))]
+    let _ = device;
+}
+
+/// The master volume, 0 (silent) to 2, over effects and music, at once.
+pub fn set_volume(volume: f32) {
+    #[cfg(feature = "sound")]
+    {
+        let volume = if volume.is_finite() {
+            volume.clamp(0.0, 2.0)
+        } else {
+            1.0
+        };
+        VOLUME.store(volume.to_bits(), Ordering::SeqCst);
+        device::apply_volume();
+    }
+    #[cfg(not(feature = "sound"))]
+    let _ = volume;
+}
+
+/// Mute (silence, everything going on in time) or unmute, at once.
+pub fn set_muted(muted: bool) {
+    #[cfg(feature = "sound")]
+    {
+        MUTED.store(muted, Ordering::SeqCst);
+        device::apply_volume();
+    }
+    #[cfg(not(feature = "sound"))]
+    let _ = muted;
+}
+
+/// Whether sound is muted.
+pub fn muted() -> bool {
+    #[cfg(feature = "sound")]
+    return MUTED.load(Ordering::SeqCst);
+    #[cfg(not(feature = "sound"))]
+    false
+}
+
 /// Whether this build plays sound at all.
 pub const AVAILABLE: bool = cfg!(feature = "sound");
 
@@ -67,6 +132,56 @@ pub fn note() -> Option<String> {
     return device::note();
     #[cfg(not(feature = "sound"))]
     None
+}
+
+/// The output playing, once one is open.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Playing {
+    /// The device's name.
+    pub device: String,
+    pub rate: u32,
+    pub channels: u16,
+    /// Frames the mixer has written to the device so far.
+    pub frames: u64,
+}
+
+/// Open the output now (it opens by itself when the engine first plays a
+/// sound), and say what it is; `None` with no device (see [`note`]), or
+/// headless, or in a build without sound.
+pub fn start() -> Option<Playing> {
+    #[cfg(feature = "sound")]
+    return device::playing();
+    #[cfg(not(feature = "sound"))]
+    None
+}
+
+/// What [`start`] says, without opening anything.
+pub fn playing() -> Option<Playing> {
+    #[cfg(feature = "sound")]
+    return device::playing_if_open();
+    #[cfg(not(feature = "sound"))]
+    None
+}
+
+/// Play `samples` (8-bit unsigned, at `rate`) on effect channel `channel`
+/// at Doom's volume `vol` (0..=127) and separation `sep` (0..=254), as the
+/// engine's sound module does. Nothing without an output.
+pub fn play_effect(channel: usize, samples: std::sync::Arc<[u8]>, rate: u32, vol: i32, sep: i32) {
+    #[cfg(feature = "sound")]
+    device::play_effect(channel, samples, rate, vol, sep);
+    #[cfg(not(feature = "sound"))]
+    let _ = (channel, samples, rate, vol, sep);
+}
+
+/// Whether an effect still plays on `channel`.
+pub fn effect_playing(channel: usize) -> bool {
+    #[cfg(feature = "sound")]
+    return device::effect_playing(channel);
+    #[cfg(not(feature = "sound"))]
+    {
+        let _ = channel;
+        false
+    }
 }
 
 /// Make `out.len() / 2` stereo frames of music (interleaved, 16-bit) at
@@ -220,6 +335,13 @@ impl Mixer {
                 }
                 voice.position += voice.step;
             }
+            // A voice that ended exactly with the block is done too.
+            if slot
+                .as_ref()
+                .is_some_and(|v| v.position as usize >= v.samples.len())
+            {
+                *slot = None;
+            }
         }
     }
 }
@@ -228,20 +350,30 @@ impl Mixer {
 mod device {
     use std::collections::HashMap;
     use std::ffi::{c_int, c_uint};
-    use std::sync::atomic::Ordering;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex, OnceLock};
+    use std::time::Duration;
 
-    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+    use intuituive::audio::{output, Output, OutputOptions};
 
-    use super::{add_music, clip, render_music, Mixer, HEADLESS_RATE, MUSIC, MUSIC_GAIN, SFX};
+    use super::{
+        add_music, clip, render_music, Mixer, Playing, DEVICE, HEADLESS_RATE, MUSIC, MUSIC_GAIN,
+        MUTED, SFX, VOLUME,
+    };
 
-    struct Output {
+    /// How far ahead of the device the mixer runs: the latency an effect
+    /// has. Each block is a few milliseconds.
+    const QUEUE: Duration = Duration::from_millis(60);
+    const BLOCK_FRAMES: usize = 256;
+
+    struct Open {
+        output: Output,
         mixer: Arc<Mutex<Mixer>>,
         cache: Mutex<HashMap<c_int, Arc<[u8]>>>,
-        rate: u32,
+        frames: Arc<AtomicU64>,
     }
 
-    static OUTPUT: OnceLock<Option<Output>> = OnceLock::new();
+    static OUTPUT: OnceLock<Option<Open>> = OnceLock::new();
     static NOTE: Mutex<Option<String>> = Mutex::new(None);
 
     pub(super) fn note() -> Option<String> {
@@ -252,7 +384,7 @@ mod device {
         fn rs_doom_quiet_alsa();
     }
 
-    fn open() -> Option<Output> {
+    fn open() -> Option<Open> {
         let sfx = SFX.load(Ordering::SeqCst);
         let music = MUSIC.load(Ordering::SeqCst);
         if !(sfx || music) || HEADLESS_RATE.load(Ordering::SeqCst) != 0 {
@@ -264,7 +396,7 @@ mod device {
             _ => "music is off",
         };
         match open_device(music) {
-            Ok(output) => Some(output),
+            Ok(open) => Some(open),
             Err(why) => {
                 *NOTE.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("{why}: {what}"));
                 None
@@ -272,68 +404,121 @@ mod device {
         }
     }
 
-    fn open_device(music: bool) -> Result<Output, String> {
-        // SAFETY: installs a no-op ALSA error handler (nothing on other
-        // platforms), so ALSA's messages stay off the game's screen.
+    fn open_device(music: bool) -> Result<Open, String> {
+        // SAFETY: installs a no-op ALSA error handler for the process
+        // (nothing on other platforms): intuiTUIve quietens ALSA while it
+        // opens the device, and this keeps the stream's later complaints
+        // (an underrun) off the game's screen too.
         unsafe { rs_doom_quiet_alsa() };
-        let host = cpal::default_host();
-        let device = host
-            .default_output_device()
-            .ok_or_else(|| "no audio output device".to_string())?;
-        let supported = device
-            .default_output_config()
-            .map_err(|e| format!("no audio output ({e})"))?;
-        let config = supported.config();
-        let channels = (config.channels as usize).max(1);
-        let rate = config.sample_rate;
+        let choice = DEVICE
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .unwrap_or_default();
+        let mut options = OutputOptions::new().queue(QUEUE);
+        if let Some(name) = &choice.name {
+            options = options.device(name.clone());
+        }
+        if let Some(rate) = choice.rate {
+            options = options.rate(rate);
+        }
+        let output = output(options).map_err(|e| format!("no audio output ({e})"))?;
+        let rate = output.rate();
+        let channels = usize::from(output.channels()).max(1);
         let mixer = Arc::new(Mutex::new(Mixer::new(rate)));
-        let shared = mixer.clone();
-        let mut scratch = Vec::new();
-        let mut tune = Vec::new();
-        let stream = device
-            .build_output_stream::<f32, _, _>(
-                config,
-                move |out: &mut [f32], _| {
-                    scratch.resize(out.len(), 0.0);
+        let frames = Arc::new(AtomicU64::new(0));
+        let (writer, shared, written) = (output.clone(), mixer.clone(), frames.clone());
+        std::thread::Builder::new()
+            .name("rs-rich-doom-mixer".into())
+            .spawn(move || {
+                let mut block = vec![0.0f32; BLOCK_FRAMES * channels];
+                let mut tune = vec![0i16; BLOCK_FRAMES * 2];
+                loop {
                     match shared.lock() {
-                        Ok(mut mixer) => mixer.mix_unclipped(&mut scratch, channels),
-                        Err(_) => scratch.fill(0.0),
+                        Ok(mut mixer) => mixer.mix_unclipped(&mut block, channels),
+                        Err(_) => block.fill(0.0),
                     }
                     // The music's lock is taken after the effects' is let
                     // go: the two are never held together.
-                    if music {
-                        tune.resize(out.len() / channels * 2, 0);
-                        if render_music(&mut tune) {
-                            let gain = f32::from_bits(MUSIC_GAIN.load(Ordering::Relaxed));
-                            add_music(&mut scratch, &tune, channels, gain);
-                        }
+                    if music && render_music(&mut tune) {
+                        let gain = f32::from_bits(MUSIC_GAIN.load(Ordering::Relaxed));
+                        add_music(&mut block, &tune, channels, gain);
                     }
-                    clip(&mut scratch);
-                    out.copy_from_slice(&scratch);
-                },
-                |_| {},
-                None,
-            )
+                    clip(&mut block);
+                    // Waits while the output's queue is full: the device
+                    // keeps the time.
+                    if !writer.write(&block) {
+                        break;
+                    }
+                    written.fetch_add(BLOCK_FRAMES as u64, Ordering::SeqCst);
+                }
+            })
             .map_err(|e| format!("no audio output ({e})"))?;
-        stream
-            .play()
-            .map_err(|e| format!("no audio output ({e})"))?;
-        // The stream plays for the rest of the process.
-        std::mem::forget(stream);
-        Ok(Output {
+        let open = Open {
+            output,
             mixer,
             cache: Mutex::new(HashMap::new()),
-            rate,
-        })
+            frames,
+        };
+        set_output_volume(&open.output);
+        Ok(open)
     }
 
-    fn output() -> Option<&'static Output> {
+    fn set_output_volume(output: &Output) {
+        let volume = match MUTED.load(Ordering::SeqCst) {
+            true => 0.0,
+            false => f32::from_bits(VOLUME.load(Ordering::SeqCst)),
+        };
+        output.set_volume(f64::from(volume));
+    }
+
+    pub(super) fn apply_volume() {
+        if let Some(Some(open)) = OUTPUT.get() {
+            set_output_volume(&open.output);
+        }
+    }
+
+    fn output_open() -> Option<&'static Open> {
         OUTPUT.get_or_init(open).as_ref()
+    }
+
+    fn describe(open: &Open) -> Playing {
+        Playing {
+            device: open.output.device().to_string(),
+            rate: open.output.rate(),
+            channels: open.output.channels(),
+            frames: open.frames.load(Ordering::SeqCst),
+        }
+    }
+
+    pub(super) fn playing() -> Option<Playing> {
+        output_open().map(describe)
+    }
+
+    pub(super) fn playing_if_open() -> Option<Playing> {
+        OUTPUT.get().and_then(Option::as_ref).map(describe)
+    }
+
+    pub(super) fn play_effect(channel: usize, samples: Arc<[u8]>, rate: u32, vol: i32, sep: i32) {
+        if let Some(open) = output_open() {
+            if let Ok(mut mixer) = open.mixer.lock() {
+                mixer.start(channel, samples, rate, vol, sep);
+            }
+        }
+    }
+
+    pub(super) fn effect_playing(channel: usize) -> bool {
+        output_open().is_some_and(|open| {
+            open.mixer
+                .lock()
+                .map(|m| m.playing(channel))
+                .unwrap_or(false)
+        })
     }
 
     #[no_mangle]
     extern "C" fn rs_doom_sound_init() -> c_int {
-        c_int::from(SFX.load(Ordering::SeqCst) && output().is_some())
+        c_int::from(SFX.load(Ordering::SeqCst) && output_open().is_some())
     }
 
     /// The rate the music module synthesizes at: the device's, or the
@@ -344,16 +529,16 @@ mod device {
             return 0;
         }
         match HEADLESS_RATE.load(Ordering::SeqCst) {
-            0 => output().map_or(0, |out| out.rate),
+            0 => output_open().map_or(0, |open| open.output.rate()),
             rate => rate,
         }
     }
 
     #[no_mangle]
     extern "C" fn rs_doom_sound_shutdown() {
-        if let Some(out) = output() {
-            if let Ok(mut mixer) = out.mixer.lock() {
-                *mixer = Mixer::new(mixer.rate);
+        if let Some(open) = output_open() {
+            if let Ok(mut mixer) = open.mixer.lock() {
+                *mixer = Mixer::new(open.output.rate());
             }
         }
     }
@@ -368,12 +553,12 @@ mod device {
         vol: c_int,
         sep: c_int,
     ) {
-        let Some(out) = output() else { return };
+        let Some(open) = output_open() else { return };
         if samples.is_null() || channel < 0 {
             return;
         }
         let data = {
-            let mut cache = out.cache.lock().unwrap_or_else(|e| e.into_inner());
+            let mut cache = open.cache.lock().unwrap_or_else(|e| e.into_inner());
             cache
                 .entry(lump)
                 .or_insert_with(|| {
@@ -382,15 +567,13 @@ mod device {
                 })
                 .clone()
         };
-        if let Ok(mut mixer) = out.mixer.lock() {
-            mixer.start(channel as usize, data, rate.max(1) as u32, vol, sep);
-        }
+        play_effect(channel as usize, data, rate.max(1) as u32, vol, sep);
     }
 
     #[no_mangle]
     extern "C" fn rs_doom_sound_params(channel: c_int, vol: c_int, sep: c_int) {
-        if let (Some(out), Ok(channel)) = (output(), usize::try_from(channel)) {
-            if let Ok(mut mixer) = out.mixer.lock() {
+        if let (Some(open), Ok(channel)) = (output_open(), usize::try_from(channel)) {
+            if let Ok(mut mixer) = open.mixer.lock() {
                 mixer.params(channel, vol, sep);
             }
         }
@@ -398,8 +581,8 @@ mod device {
 
     #[no_mangle]
     extern "C" fn rs_doom_sound_stop(channel: c_int) {
-        if let (Some(out), Ok(channel)) = (output(), usize::try_from(channel)) {
-            if let Ok(mut mixer) = out.mixer.lock() {
+        if let (Some(open), Ok(channel)) = (output_open(), usize::try_from(channel)) {
+            if let Ok(mut mixer) = open.mixer.lock() {
                 mixer.stop(channel);
             }
         }
@@ -407,15 +590,7 @@ mod device {
 
     #[no_mangle]
     extern "C" fn rs_doom_sound_playing(channel: c_int) -> c_int {
-        let playing = match (output(), usize::try_from(channel)) {
-            (Some(out), Ok(channel)) => out
-                .mixer
-                .lock()
-                .map(|m| m.playing(channel))
-                .unwrap_or(false),
-            _ => false,
-        };
-        c_int::from(playing)
+        c_int::from(usize::try_from(channel).is_ok_and(effect_playing))
     }
 }
 
@@ -446,6 +621,12 @@ mod tests {
         assert!([9, 11, 13, 15].iter().all(|&i| out[i] < -0.4));
         assert!(!mixer.playing(2), "ended after its samples");
         mixer.stop(9);
+        // A voice that fills a block exactly ends with it.
+        let samples: std::sync::Arc<[u8]> = vec![255u8; 4].into();
+        mixer.start(0, samples, 22050, 127, 128);
+        let mut out = vec![0.0f32; 8];
+        mixer.mix(&mut out, 2);
+        assert!(!mixer.playing(0));
     }
 
     #[test]

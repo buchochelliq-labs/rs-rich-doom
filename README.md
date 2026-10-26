@@ -1,6 +1,13 @@
 # rs-rich-doom
 
+Doom in the terminal, drawn and driven by [rs-rich](https://github.com/buchochelliq-labs/rs-rich-cli)
+and its TUI framework [intuiTUIve](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/).
+
 ![Freedoom's first demo in half blocks, recorded with rs-rich-record](docs/media/doom-half/doom-half.gif)
+
+**[Watch it with sound](docs/media/doom-play.mp4)** (30 s, MP4: the first demo
+in half blocks at 160x45 in xterm, with the game's effects and OPL music;
+made by [docs/media/play/record.sh](docs/media/play/record.sh)).
 
 *Freedoom's first demo (`-- -playdemo demo1`) in half blocks, 100x32, 35
 frames a second; also [in Kitty graphics](docs/media/doom-kitty/doom-kitty.gif)
@@ -11,18 +18,48 @@ game data is in this repository. Recorded with
 [rs-rich-record](https://github.com/buchochelliq-labs/rs-rich-cli/tree/main/crates/rich-record)
 (`rich record`), which follows the program on a PTY and decodes its Kitty
 images: the tapes are [docs/tapes](docs/tapes), and re-recording takes the
-IWAD's directory as the current one (see the tapes' comments).*
+IWAD's directory as the current one (see the tapes' comments). The GIFs and
+APNGs were recorded before the move to the rs-rich 0.0.21 crates; half
+blocks and Kitty draw the same picture since. Freedoom's licence for the
+footage: [docs/media/FREEDOOM-COPYING.txt](docs/media/FREEDOOM-COPYING.txt).*
 
 Real Doom in the terminal. The engine is id Software's GPL release of Doom,
 through [doomgeneric](https://github.com/ozkl/doomgeneric) (Chocolate Doom's
 code with a six-function platform layer); the picture, the keyboard and the
 app loop are the [rs-rich](https://github.com/buchochelliq-labs/rs-rich-cli)
-crates: rs-rich-art (Kitty, Sixel and iTerm2 encoders), rs-rich-ext
-(capability detection, the graphics side channel), rs-rich-interact (the
-terminal session, raw input, the kitty keyboard protocol, synchronized
-output) and intuiTUIve (the app, the `latest` signal, a custom `Widget`).
-Doom draws its own HUD; the app adds nothing over it but an optional fps
-counter.
+crates, from crates.io (the 0.0.21 cohort): [rs-rich-art](https://crates.io/crates/rs-rich-art) (Kitty, Sixel and
+iTerm2 encoders), [rs-rich-ext](https://crates.io/crates/rs-rich-ext) (capability detection, the graphics side
+channel), [rs-rich-interact](https://crates.io/crates/rs-rich-interact) (the terminal session, raw input, the kitty
+keyboard protocol, synchronized output) and [intuiTUIve](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/) (the app; pixel
+cells; held keys; `fixed_step`, which is the game's clock; the frame-rate
+meter and stats; the audio output). Doom draws its own HUD; the app adds
+nothing over it but an optional fps counter. What rs-rich still lacks for
+this, and could take into core, is in
+[docs/core-gaps.md](docs/core-gaps.md).
+
+## Built with rs-rich and intuiTUIve
+
+rs-rich-doom is a demo of what the rs-rich crates can drive: a 35 Hz game
+with its own picture, held keys and sound, in an ordinary terminal.
+
+- **[rs-rich](https://github.com/buchochelliq-labs/rs-rich-cli)**: a Rust
+  port of Python's [rich](https://github.com/Textualize/rich), with the
+  `rich` command line, terminal graphics, recordings and interactive
+  components. [Documentation](https://buchochelliq-labs.github.io/rs-rich-cli/latest/) ·
+  [crates.io](https://crates.io/crates/rs-rich).
+- **[intuiTUIve](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/)**: rs-rich's TUI framework
+  (signals, a retained tree, a cell screen, held keys, a fixed-step clock,
+  audio output), which runs this game.
+  [Tutorial: a to-do app](https://buchochelliq-labs.github.io/rs-rich-cli/latest/guide/intuituive/tutorial/) ·
+  [crates.io](https://crates.io/crates/rs-rich-intuituive) ·
+  [source](https://github.com/buchochelliq-labs/rs-rich-cli/tree/main/crates/rich-intuituive).
+
+What Doom needed and rs-rich did not yet have became rs-rich work: see
+[docs/core-gaps.md](docs/core-gaps.md).
+
+DOOM is a registered trademark of id Software LLC, a ZeniMax Media company.
+rs-rich-doom is not affiliated with or endorsed by id Software, ZeniMax or
+Microsoft.
 
 ## Licence
 
@@ -32,6 +69,15 @@ in its own repository. rs-rich (MIT) is used as an ordinary library
 dependency and stays MIT. The vendored engine is in
 [`doomgeneric/`](doomgeneric) with its licence and a [NOTE](doomgeneric/NOTE)
 of the upstream commit and the one local change.
+
+**Binaries are GPL-3.0-or-later** ([`LICENSE-GPL-3.0`](LICENSE-GPL-3.0)).
+They link Apache-2.0-only Rust code (cpal for sound, ring for HTTPS), which
+GPLv3 allows and GPLv2 does not; the "or later" permits it. The source
+stays GPL-2.0-or-later. A binary release ships `LICENSE-GPL-3.0` and
+`THIRD-PARTY-NOTICES.html`, which
+`cargo about generate --locked --fail about.hbs -o THIRD-PARTY-NOTICES.html`
+writes (CI checks it on every push). Every component's licence is in
+[docs/licensing.md](docs/licensing.md).
 
 **No game data is included.** Play the shareware `doom1.wad`, an IWAD you
 own (`doom.wad`, `doom2.wad`, `plutonia.wad`, `tnt.wad`), or
@@ -45,6 +91,8 @@ own (`doom.wad`, `doom2.wad`, `plutonia.wad`, `tnt.wad`), or
 cargo install --git https://github.com/buchochelliq-labs/rs-rich-doom
 # or, without sound (no ALSA needed):
 cargo install --git https://github.com/buchochelliq-labs/rs-rich-doom --no-default-features
+# or with PulseAudio/PipeWire spoken to directly:
+cargo install --git https://github.com/buchochelliq-labs/rs-rich-doom --features pulse
 ```
 
 A C compiler is needed (the engine is built by `build.rs` with the `cc`
@@ -72,8 +120,10 @@ on Windows, or `$RS_RICH_DOOM_DATA`. Doom's `default.cfg` and saves go there too
 | `--fps` | frame rate and draw time in the top-left corner |
 | `--stretch` | fill the terminal instead of Doom's 4:3 |
 | `--no-sound` | no sound effects |
-| `--hold-ms MS` | hold time for keys without release events (default 400) |
-| `--stats` | print frames drawn, fps and draw time on exit |
+| `--volume PERCENT` | loudness of everything, 0 to 200 (default 100); Ctrl+S mutes in the game |
+| `--audio-device NAME` | the audio output, by id or name (default: the system's) |
+| `--hold-ms MS` | how long a key without release events stays held after its last press or repeat (default 400) |
+| `--stats` | print frames drawn, fps, tics and the last frame's size on exit |
 | `--quit-after S` | quit after S seconds (benchmarks) |
 | `--sixel-width PX` | widest Sixel image sent (default 640) |
 
@@ -93,43 +143,50 @@ on Windows, or `$RS_RICH_DOOM_DATA`. Doom's `default.cfg` and saves go there too
 | F1–F12 | help, save, load, options, …, F10 quit |
 | `-` `=` | screen size |
 | letters | cheats (`iddqd`, `idkfa`, …) |
+| Ctrl+S | mute or unmute |
 | Ctrl+C | quit at once |
 
 ### Key releases
 
 Doom needs a key-down and a key-up for every key. Terminals send presses
 (and auto-repeat as more presses); only terminals with the **kitty keyboard
-protocol** also send releases, which rs-rich-interact turns on when the
-terminal answers its query.
+protocol** also send releases. The app asks for every key's
+(`App::all_keys`, kitty flags 1, 2, 4 and 8) and keeps intuiTUIve's **held
+keys**; once a tic it gives Doom the keys that went down and up.
 
-- With kitty (kitty, foot, WezTerm, Ghostty, Alacritty, recent iTerm2): the
-  first time a key's release arrives, that key is trusted from then on and
-  held exactly as long as it is held. Turning and running feel like the
-  original.
-- Without it (most others, tmux, screen): releases are synthesized. A
-  movement key stays down 400 ms after its first press (to bridge the
-  keyboard's auto-repeat delay; `--hold-ms`) and 120 ms after each repeat;
-  menu keys, weapons and Space are taps of 80 ms. A tap of an arrow turns
-  a little too far; holding works.
-- Modifier keys alone are never reported to a terminal program (rs-rich
-  pushes the kitty flags 1 and 2, not 8), so Ctrl, Shift and Alt act only
-  together with another key: hold Ctrl while turning to fire, or use `x`.
-  Enter, Tab and Backspace never report releases and are always taps.
+- With kitty (kitty, foot, WezTerm, Ghostty, Alacritty, recent iTerm2): a
+  key is held exactly as long as it is held, and Ctrl, Shift and Alt are
+  reported on their own: hold Ctrl to fire, Shift to run. Turning and
+  running feel like the original.
+- Without it (most others, tmux, screen): intuiTUIve makes up the releases
+  (`App::synthesize_releases`): a key stays held 400 ms after its last
+  press or repeat (`--hold-ms`; longer than the keyboard's repeat delay).
+  So a key let go keeps acting for up to 400 ms; before 0.0.21 this port
+  timed a repeat's hold at 120 ms itself
+  ([a core gap](docs/core-gaps.md#4-made-up-releases-with-a-first-press-hold-and-a-repeat-hold-intuituive)).
+  Ctrl, Shift and Alt come only with another key: hold Ctrl while turning to
+  fire, or use `x`.
+- Menu keys, weapons, Space and letters are taps: down for one tic and up
+  the next, once a press, so a held menu key repeats and `iddqd` types both
+  `d`s. Movement and fire are held. `x`, `z` and Ctrl all fire, and fire
+  stays down while any of them is held.
 
 ## Modes
 
 | Mode | What | Needs |
 |---|---|---|
 | `half` | `▀` cells, top pixel foreground, bottom background: 1×2 pixels a cell in truecolour | any truecolour (or 256-colour) terminal |
-| `braille` | Braille dots, 2×4 a cell, two of the frame's colours per cell | Unicode font with Braille |
+| `braille` | Braille dots, 2×4 a cell, two colours per cell (the averages of the lit and the unlit dots) | Unicode font with Braille |
 | `kitty` | the real 320×200 frame, Kitty graphics protocol with Unicode placeholders, scaled by the terminal | kitty, Ghostty, WezTerm |
 | `sixel` | the frame at the cells' pixel size (≤ 640 wide), Sixel with the frame's own palette | foot, WezTerm, mlterm, xterm `-ti vt340`, Windows Terminal 1.22+, Konsole |
 | `iterm` | iTerm2 inline images | iTerm2, WezTerm |
 | `auto` | Kitty, Sixel or iTerm2 when rs-rich-ext detects it (`RICH_GRAPHICS=…` overrides), else `half` | |
 
 The picture keeps Doom's 4:3 aspect, from the cell size the terminal reports
-(else 1:2 cells), centred; `--stretch` fills the screen. Cells are sampled
-nearest-neighbour so they keep Doom's 256 colours (see the notes below).
+(else 1:2 cells), centred; `--stretch` fills the screen. The frame is
+sampled nearest-neighbour into an intuiTUIve `pixels` node, which draws its
+cells (pixel cells, no styles built per cell); half blocks keep Doom's 256
+colours exactly.
 
 ### Terminal support
 
@@ -147,31 +204,32 @@ nearest-neighbour so they keep Doom's 256 colours (see the notes below).
 | macOS Terminal.app | half (256 colours) | no: synthesized |
 | tmux, screen | half | no: synthesized |
 
-Only half blocks, Braille and the escape output of the image modes were
-exercised here (in a pty); the image modes have not been looked at in a
-real Kitty or Sixel terminal yet.
+Half blocks were watched in xterm (the video above); Braille and the image
+modes' escapes were exercised in a pty and under the recorder. The image
+modes have not been looked at in a real Kitty or Sixel terminal yet.
 
 ### Measured
 
-Freedoom's first demo (`-- -playdemo demo1`), 10 s in a pty, `--stats`:
-frames the app drew per second (the engine makes 35; identical frames are
-not sent), on a Linux VM.
+Freedoom's first demo (`-- -playdemo demo1`), 10 s in a pty (`script`),
+`--no-sound --no-music --stats`, on a Linux VM, 2026-10-25, with the rs-rich
+0.0.21 crates: frames the app drew a second. The engine runs 35 tics a
+second on the app's clock in every case (350 in 10 s); identical frames are
+not sent, so 34 is all there is to draw. A slower build draws fewer frames,
+but the game keeps time (`fixed_step` hands over the tics owed).
 
-| Size | Mode | release | debug |
-|---|---|---:|---:|
-| 80×24 | half | 34.8 fps (3.3 ms a draw) | 34.6 (12.5 ms) |
-| 80×24 | braille | 34.8 (3.6 ms) | 33.7 (17.6 ms) |
-| 80×24 | kitty | 34.8 | 13.0 |
-| 80×24 | sixel | 34.7 | 11.7 |
-| 160×50 | half | 33.4 (11.2 ms) | 18.7 (41.5 ms) |
-| 160×50 | braille | 32.9 (13.3 ms) | 15.9 (53.9 ms) |
-| 160×50 | kitty | 33.3 | 12.5 |
-| 160×50 | sixel | 33.7 | 7.0 |
+| Size | Mode | release | debug | per frame (release) |
+|---|---|---:|---:|---:|
+| 80×24 | half | 33.8 fps | 34.0 | 37 kB |
+| 80×24 | braille | 33.9 | 34.0 | 42 kB |
+| 80×24 | kitty | 34.0 | 16.9 | 184 kB |
+| 80×24 | sixel | 33.0 | 12.6 | 169 kB |
+| 160×50 | half | 33.9 | 34.0 | 154 kB |
+| 160×50 | braille | 33.9 | 24.9 | 169 kB |
+| 160×50 | kitty | 33.9 | 14.7 | 184 kB |
+| 160×50 | sixel | 34.0 | 7.7 | 219 kB |
 
-Half blocks cost about 34 kB a frame at 80×24 and 140 kB at 160×50
-(about 1.2 MB/s and 5 MB/s); Kitty and Sixel about 180 kB a frame at any
-size. `cargo run --release --example draw_bench -- IWAD COLS ROWS MODE`
-measures the app side alone with the headless driver.
+`cargo run --release --example draw_bench -- IWAD COLS ROWS MODE` measures
+the app side alone with the headless driver, and the styles it keeps.
 
 ## Screenshot
 
@@ -208,10 +266,14 @@ truecolour terminal. By brightness:
 
 ## Sound
 
-Sound effects play through cpal (ALSA, CoreAudio, WASAPI): the engine's
-sound module (`csrc/sound.c`) reads each effect's DMX lump and a small Rust
-mixer (`src/sound.rs`) resamples and pans it. Music: see below.
-`--no-sound`, or build with `--no-default-features`.
+Sound plays through intuiTUIve's audio output (its `audio` feature, on
+cpal: ALSA, CoreAudio, WASAPI; `--features pulse` for PulseAudio and
+PipeWire directly). The engine's sound module (`csrc/sound.c`) reads each
+effect's DMX lump, and a small Rust mixer (`src/sound.rs`) resamples and
+pans it by Doom's rules and adds the music. A thread writes the mix a block
+at a time to the output, which keeps about 60 ms queued. The master volume
+(`--volume`) and mute (Ctrl+S) are the output's. `--no-sound`, or build
+with `--no-default-features`. Music: see below.
 
 ## Music
 
@@ -221,9 +283,9 @@ the MUS songs with the instrument patches from the IWAD's `GENMIDI` lump
 [Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom)'s OPL
 code (`i_oplmusic.c`, DMX's voice allocation and quirks) driving the
 [Nuked OPL3](https://github.com/nukeykt/Nuked-OPL3) emulator, vendored in
-[`opl/`](opl) (GPL-2.0 and LGPL-2.1; see its [NOTE](opl/NOTE)). The Rust
-audio callback pulls the samples at the device's rate and mixes them with
-the effects; the game's own music volume (Options → Sound) applies.
+[`opl/`](opl) (GPL-2.0 and LGPL-2.1; see its [NOTE](opl/NOTE)). The mixer
+thread pulls the samples at the device's rate and adds them to the effects;
+the game's own music volume (Options → Sound) applies.
 Emulating the chip costs about 1.5% of one core.
 
 | Option | |
@@ -237,14 +299,16 @@ line after it exits.
 ## How it works
 
 ```
-engine thread (intuiTUIve `latest`)            app thread (intuiTUIve)
-  doomgeneric_Tick() at 35 Hz                    DoomView widget
-   DG_DrawFrame ─► rs_doom_draw_frame ─ Latest ─►  draw(): fit 4:3, sample,
-                    (skips repeats)    (newest     half blocks / Braille cells,
-                                        wins)      or placeholders + a graphic
-   DG_GetKey ◄── KeyState ◄─ mpsc ◄──────────── event(): Key / KeyUp → Input
-   (synthesized key-ups by hold time)            graphics: Pictures (PlacementSource)
-   printf/exit ─► Rust log / clean quit             Kitty, Sixel, iTerm2 escapes
+engine thread                                   app thread (intuiTUIve)
+  doomgeneric_Tick()                              fixed_step, 35 Hz (the clock)
+   DG_SleepMs ─► idle at tic n, wait ◄─ Pace ──── give the tics owed, wait for idle
+   DG_DrawFrame ─► newest frame slot ──────────►   frame signal ─► pixels node
+                    (skips repeats)                 (half blocks, Braille: pixel cells)
+   DG_GetKey ◄── downs and ups ◄─ mpsc ◄────────   Keyboard: held keys diffed a tic,
+                                                    taps (on_any_key)
+   printf/exit ─► Rust log / clean quit           ImageView + Pictures (PlacementSource):
+                                                    Kitty, Sixel, iTerm2 escapes
+mixer thread: effects (DMX) + OPL music ─► intuiTUIve audio output (volume, mute)
 ```
 
 - `build.rs` compiles `doomgeneric/` and `csrc/` with `cc` at 320×200;
@@ -252,24 +316,41 @@ engine thread (intuiTUIve `latest`)            app thread (intuiTUIve)
   go to Rust (a log, shown if the engine fails; a clean quit for F10 → Y)
   instead of the terminal the game is drawn on.
 - `src/engine.rs` implements `DG_Init`, `DG_DrawFrame`, `DG_SleepMs`,
-  `DG_GetTicksMs`, `DG_GetKey`, `DG_SetWindowTitle` (`extern "C"`), with a
-  virtual clock for headless tests.
-- `src/keys.rs` maps keys and turns presses, repeats and releases into
-  Doom's downs and ups; `src/render.rs` fits, samples and converts;
-  `src/graphics.rs` encodes images; `src/app.rs` is the app.
+  `DG_GetTicksMs`, `DG_GetKey`, `DG_SetWindowTitle` (`extern "C"`). Its
+  clock is the app's: `Pace` moves it on a tic at a time and waits while
+  the engine runs them (a virtual clock serves the engine-only tests).
+- `src/keys.rs` maps keys and turns held keys and taps into Doom's downs
+  and ups; `src/render.rs` fits and samples into the pixel buffer;
+  `src/graphics.rs` encodes images; `src/sound.rs` mixes; `src/app.rs` is
+  the app.
+- Doom's own file arguments (`-file`, `-deh`, `-playdemo`, …) are made
+  absolute before the game changes to its data directory.
 
 ## Tests
 
-`cargo test` covers the key mapping and key-up synthesis, fitting and
-aspect, sampling, the half-block and Braille conversion of synthetic
-framebuffers, the Sixel encoder, placements, the mixer, the CLI and the
-Freedoom unpacking. With `RS_RICH_DOOM_IWAD=/path/freedoom1.wad`,
-`tests/engine.rs` runs 400 engine tics headless on a virtual clock and
-checks the frames; CI downloads Freedoom for it.
+`cargo test` covers the key mapping, held keys and taps, fitting and
+sampling, the pixel-cell view (under intuiTUIve's headless driver), the
+stepped clock, the Sixel encoder and placements, the mixer and the OPL
+music, the CLI, the argument paths and the Freedoom unpacking. With
+`RS_RICH_DOOM_IWAD=/path/freedoom1.wad`:
+
+- `tests/engine.rs` runs 400 engine tics headless on a virtual clock and
+  checks the frames and the music;
+- `tests/app.rs` runs the whole app with the real engine under the headless
+  driver: exactly 35 tics a second of driver time, walking while a key is
+  held and stopping after, a menu opened with a tap, and 120 s of Braille
+  with the screen's style table staying bounded.
+
+`tests/audio_device.rs` (Linux) plays effects through a real ALSA device
+with no sound card (the `file` plugin over `null`, into a FIFO read at the
+sample rate): every frame of an effect reaches the device, none while
+muted, half the peak at half volume. CI downloads Freedoom, and
+`RS_RICH_DOOM_REQUIRE_IWAD=1` makes the IWAD tests fail rather than skip.
 
 ## Credits
 
 - id Software, for Doom and its 1997/1999 GPL source release.
 - Simon Howard and the Chocolate Doom authors; ozkl's doomgeneric.
-- The Freedoom project (BSD licence) for free game data.
+- The Freedoom project (BSD licence) for free game data; the footage in
+  `docs/media` shows it ([its licence](docs/media/FREEDOOM-COPYING.txt)).
 - rs-rich and rs-rich-cli (MIT).
